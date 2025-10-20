@@ -13,8 +13,8 @@ type User struct {
 	Username   string    `gorm:"column:username;index"`
 	TgName     string    `gorm:"column:tg_name"`
 	SavedName  string    `gorm:"column:saved_name"`
-	LichessID  string    `gorm:"column:lichess_id;unique"`
-	ChessComID string    `gorm:"column:chesscom_id;unique"`
+	Lichess    string    `gorm:"column:lichess;unique"`
+	ChessCom   string    `gorm:"column:chesscom;unique"`
 	IsBanned   bool      `gorm:"column:is_banned;default:false"`
 	IsNotGreen bool      `gorm:"column:is_not_green"`
 	State      State     `gorm:"column:state"`
@@ -29,8 +29,8 @@ const (
 	StateAskedChessCom    State = "chesscomusername_asked"
 	StateAskedSavedName   State = "asked_saved_name"
 	StateEditingSavedName State = "editing_saved_name"
-	StateEditingLichess   State = "editing_lichess_id"
-	StateEditingChessCom  State = "editing_chesscom_id"
+	StateEditingLichess   State = "editing_lichess"
+	StateEditingChessCom  State = "editing_chesscom"
 )
 
 // TableName specifies the table name for User model

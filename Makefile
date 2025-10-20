@@ -43,7 +43,7 @@ deploy: build docker-build docker-push docker-clean
 		docker pull sukalov/mshkbot:latest; \
 		docker run --name mshk \
 		--restart always \
-		--env-file .env -v \
+		--env-file ./mshk/.env -v \
 		$(pwd)/root/.env:/root/.env \
 		-d sukalov/mshkbot:latest \
 	"

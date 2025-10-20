@@ -8,14 +8,17 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/mshkbot/internal/bot"
 	"github.com/sukalov/mshkbot/internal/db"
+	"github.com/sukalov/mshkbot/internal/utils"
 )
 
 // GetHandlers returns handler set for private messages
 func GetHandlers() bot.HandlerSet {
 	return bot.HandlerSet{
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-			"start": handleStart,
-			"help":  handleHelp,
+			"start":     handleStart,
+			"help":      handleHelp,
+			"me":        handleMe,
+			"myratings": handleMyRatings,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handlePrivateMessage,
@@ -137,6 +140,45 @@ func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.Message.Chat.ID, "help")
 }
 
+func handleMe(b *bot.Bot, update tgbotapi.Update) error {
+	chatID := update.Message.Chat.ID
+
+	if user, err := db.GetByChatID(chatID); err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	} else {
+		return b.SendMessage(chatID, db.Stringify(user, false))
+	}
+}
+
+func handleMyRatings(b *bot.Bot, update tgbotapi.Update) error {
+	chatID := update.Message.Chat.ID
+	var lichess, chesscom string
+	if user, err := db.GetByChatID(chatID); err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	} else {
+
+		if user.Lichess == "" {
+			lichess = "личес не указан"
+		}
+		if user.ChessCom == "" {
+			chesscom = "чесском не указан"
+		}
+
+		lichessTopRatings, err := utils.GetLichessAllTimeHigh(user.Lichess)
+		if err != nil {
+			return fmt.Errorf("ошибка при запросе к базе личеса: %w", err)
+		}
+		chesscomTopRatings, err := utils.GetChessComAllTimeHigh(user.ChessCom)
+		if err != nil {
+			return fmt.Errorf("ошибка при запросе к базе чесскома: %w", err)
+		}
+		lichess = fmt.Sprintf("пиковые рейтинги на личесе: блиц %d, рапид %d, классика %d", lichessTopRatings.Blitz, lichessTopRatings.Rapid, lichessTopRatings.Classical)
+		chesscom = fmt.Sprintf("пиковые рейтинги на чесскоме: блиц %d, рапид %d, классика %d", chesscomTopRatings.Blitz, chesscomTopRatings.Rapid, chesscomTopRatings.Classical)
+
+		return b.SendMessage(chatID, fmt.Sprintf("%s\n%s", lichess, chesscom))
+	}
+}
+
 func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 	if update.Message == nil {
 		return nil
@@ -153,7 +195,16 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 
 	switch state {
 	case db.StateAskedLichess:
-		username := strings.TrimSpace(update.Message.Text)
+		username := strings.TrimPrefix(strings.TrimSpace(update.Message.Text), "@")
+		if username == "" {
+			return b.SendMessage(chatID, "юзернейм не может быть пустым")
+		}
+
+		allTimeHigh, err := utils.GetLichessAllTimeHigh(username)
+		if err != nil {
+			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
+		}
+		log.Printf("all time high: %d", allTimeHigh)
 
 		// save the username
 		if err := db.UpdateLichess(chatID, username); err != nil {
@@ -169,7 +220,10 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 		return b.SendMessage(chatID, "введите ваш никнейм для турниров:")
 
 	case db.StateAskedChessCom:
-		username := strings.TrimSpace(update.Message.Text)
+		username := strings.TrimPrefix(strings.TrimSpace(update.Message.Text), "@")
+		if username == "" {
+			return b.SendMessage(chatID, "юзернейм не может быть пустым")
+		}
 
 		// save the username
 		if err := db.UpdateChessCom(chatID, username); err != nil {

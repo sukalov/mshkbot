@@ -77,17 +77,17 @@ func UpdateSavedName(chatID int64, newName string) error {
 	return nil
 }
 
-func UpdateLichess(chatID int64, lichessID string) error {
+func UpdateLichess(chatID int64, lichess string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("lichess_id", lichessID)
+		Update("lichess", lichess)
 
 	if result.Error != nil {
-		return fmt.Errorf("failed to update lichess id: %w", result.Error)
+		return fmt.Errorf("failed to update lichess: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
@@ -97,17 +97,17 @@ func UpdateLichess(chatID int64, lichessID string) error {
 	return nil
 }
 
-func UpdateChessCom(chatID int64, chessComID string) error {
+func UpdateChessCom(chatID int64, chessCom string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("chesscom_id", chessComID)
+		Update("chesscom", chessCom)
 
 	if result.Error != nil {
-		return fmt.Errorf("failed to update chess.com id: %w", result.Error)
+		return fmt.Errorf("failed to update chesscom: %w", result.Error)
 	}
 
 	if result.RowsAffected == 0 {
@@ -226,4 +226,20 @@ func Delete(chatID int64) error {
 	}
 
 	return nil
+}
+
+func Stringify(u User, markdown bool) string {
+	builder := strings.Builder{}
+
+	if u.SavedName != "" {
+		builder.WriteString(fmt.Sprintf("ник: %s\n", u.SavedName))
+	}
+	if u.Lichess != "" {
+		builder.WriteString(fmt.Sprintf("lichess.org/@/%s\n", u.Lichess))
+	}
+	if u.ChessCom != "" {
+		builder.WriteString(fmt.Sprintf("chess.com/member/%s\n", u.ChessCom))
+	}
+
+	return builder.String()
 }
