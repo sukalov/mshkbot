@@ -71,7 +71,10 @@ func GetLichessAllTimeHigh(username string) (TopRatings, error) {
 
 	for _, gameType := range ratingHistory {
 		var maxRating int
-		for _, point := range gameType.Points {
+		for i, point := range gameType.Points {
+			if i < 5 {
+				continue
+			}
 			if len(point) >= 4 {
 				rating := point[3]
 				if rating > maxRating {
