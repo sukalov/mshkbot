@@ -13,10 +13,25 @@ type User struct {
 	Username   string    `gorm:"column:username;index"`
 	TgName     string    `gorm:"column:tg_name"`
 	SavedName  string    `gorm:"column:saved_name"`
-	LichessID  string    `gorm:"column:lichess_id"`
-	ChessComID string    `gorm:"column:chesscom_id"`
+	LichessID  string    `gorm:"column:lichess_id;unique"`
+	ChessComID string    `gorm:"column:chesscom_id;unique"`
+	IsBanned   bool      `gorm:"column:is_banned;default:false"`
+	IsNotGreen bool      `gorm:"column:is_not_green"`
+	State      State     `gorm:"column:state"`
 	AddedAt    time.Time `gorm:"column:added_at;autoCreateTime"`
 }
+
+type State string
+
+const (
+	StateCompleted        State = "completed"
+	StateAskedLichess     State = "lichess_username_asked"
+	StateAskedChessCom    State = "chesscomusername_asked"
+	StateAskedSavedName   State = "asked_saved_name"
+	StateEditingSavedName State = "editing_saved_name"
+	StateEditingLichess   State = "editing_lichess_id"
+	StateEditingChessCom  State = "editing_chesscom_id"
+)
 
 // TableName specifies the table name for User model
 func (User) TableName() string {

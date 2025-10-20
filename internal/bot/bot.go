@@ -251,3 +251,8 @@ func (b *Bot) SendMessageWithButtonsNoLinks(
 	_, err := b.Client.Send(msg)
 	return err
 }
+
+// plain request to telegram API
+func (b *Bot) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
+	return b.Client.Request(c)
+}

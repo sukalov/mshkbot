@@ -13,11 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type UsersType struct{}
-
-var Users = &UsersType{}
-
-func (u *UsersType) Register(update tgbotapi.Update) error {
+func Register(update tgbotapi.Update) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -44,7 +40,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	return nil
 }
 
-func (u *UsersType) GetByChatID(chatID int64) (User, error) {
+func GetByChatID(chatID int64) (User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -61,7 +57,7 @@ func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	return user, nil
 }
 
-func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
+func UpdateSavedName(chatID int64, newName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -81,8 +77,108 @@ func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	return nil
 }
 
+func UpdateLichess(chatID int64, lichessID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("lichess_id", lichessID)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update lichess id: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+func UpdateChessCom(chatID int64, chessComID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("chesscom_id", chessComID)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update chess.com id: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+func UpdateState(chatID int64, state State) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("state", state)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update state: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+func SetBanned(chatID int64, isBanned bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("is_banned", isBanned)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update ban status: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+func SetNotGreen(chatID int64, isNotGreen bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("is_not_green", isNotGreen)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update green status: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
 // GetAll returns all users
-func (u *UsersType) GetAll() ([]User, error) {
+func GetAll() ([]User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -95,8 +191,28 @@ func (u *UsersType) GetAll() ([]User, error) {
 	return users, nil
 }
 
+func GetUserState(chatID int64) (State, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user User
+	result := Database.WithContext(ctx).
+		Select("state").
+		Where("chat_id = ?", chatID).
+		First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return "", fmt.Errorf("user not found: %d", chatID)
+		}
+		return "", fmt.Errorf("failed to get user state: %w", result.Error)
+	}
+
+	return user.State, nil
+}
+
 // Delete removes a user by chat ID
-func (u *UsersType) Delete(chatID int64) error {
+func Delete(chatID int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
