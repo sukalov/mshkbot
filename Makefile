@@ -1,33 +1,35 @@
-# Define variables
+export
+-include .env
+
 BINARY_NAME=bin/mshkbot
 LDFLAGS=
 
-# Download dependencies
+# download dependencies
 .PHONY: deps
 deps:
 	go mod download
 
-# Build binary
+# build binary
 .PHONY: build
 build: deps
 	CGO_ENABLED=0 GOOS=linux go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/mshkbot
 
-# Build Docker image
+# build docker image
 .PHONY: docker-build
 docker-build: build
 	docker buildx build -t sukalov/mshkbot --platform linux/amd64 .
 
-# Push Docker image
+# push docker image
 .PHONY: docker-push
 docker-push:
 	docker push sukalov/mshkbot:latest
 
-# Development run with Air hot reload
+# development run with Air hot reload
 .PHONY: dev
 dev:
 	air
 
-# Clean up old Docker images
+# clean up old docker images
 .PHONY: docker-clean
 docker-clean:
 	ssh root@${DEPLOY_HOST} "\
@@ -36,7 +38,7 @@ docker-clean:
 		docker image prune -f \
 	"
 
-# Deployment command
+# deployment command
 .PHONY: deploy
 deploy: build docker-build docker-push docker-clean
 	ssh root@${DEPLOY_HOST} "\
