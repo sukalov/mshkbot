@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/sukalov/mshkbot/internal/bot"
+	"github.com/sukalov/mshkbot/internal/cron"
 	"github.com/sukalov/mshkbot/internal/db"
 	"github.com/sukalov/mshkbot/internal/handlers/admingroup"
 	"github.com/sukalov/mshkbot/internal/handlers/maingroup"
@@ -44,13 +45,17 @@ func main() {
 		log.Fatalf("failed to create bot: %v", err)
 	}
 
+	// create scheduler
+	scheduler := cron.New(botInstance, mainGroupID)
+
 	// get handlers from each package
 	mainGroupHandlers := maingroup.GetHandlers()
 	adminGroupHandlers := admingroup.GetHandlers()
 	privateHandlers := privatechat.GetHandlers()
 
-	// start bot in goroutine
+	// start bot and scheduler in goroutines
 	go botInstance.Start(mainGroupHandlers, adminGroupHandlers, privateHandlers)
+	go scheduler.Start()
 
 	// wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
@@ -59,6 +64,7 @@ func main() {
 
 	// cleanup
 	log.Println("shutting down...")
+	scheduler.Stop()
 	botInstance.Stop()
 	db.Close()
 	log.Println("shutdown complete")
