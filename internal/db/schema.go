@@ -13,8 +13,8 @@ type User struct {
 	Username   string    `gorm:"column:username;index"`
 	TgName     string    `gorm:"column:tg_name"`
 	SavedName  string    `gorm:"column:saved_name"`
-	Lichess    string    `gorm:"column:lichess;unique"`
-	ChessCom   string    `gorm:"column:chesscom;unique"`
+	Lichess    *string   `gorm:"column:lichess;unique"`
+	ChessCom   *string   `gorm:"column:chesscom;unique"`
 	IsBanned   bool      `gorm:"column:is_banned;default:false"`
 	IsNotGreen bool      `gorm:"column:is_not_green"`
 	State      State     `gorm:"column:state"`

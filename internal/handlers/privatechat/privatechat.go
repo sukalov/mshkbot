@@ -157,23 +157,32 @@ func handleMyRatings(b *bot.Bot, update tgbotapi.Update) error {
 		return fmt.Errorf("failed to get user: %w", err)
 	} else {
 
-		if user.Lichess == "" {
+		if user.Lichess == nil || *user.Lichess == "" {
 			lichess = "личес не указан"
 		}
-		if user.ChessCom == "" {
+		if user.ChessCom == nil || *user.ChessCom == "" {
 			chesscom = "чесском не указан"
 		}
 
-		lichessTopRatings, err := utils.GetLichessAllTimeHigh(user.Lichess)
-		if err != nil {
-			return fmt.Errorf("ошибка при запросе к базе личеса: %w", err)
+		var lichessUsername, chesscomUsername string
+		if user.Lichess != nil {
+			lichessUsername = *user.Lichess
+
+			lichessTopRatings, err := utils.GetLichessAllTimeHigh(lichessUsername)
+			if err != nil {
+				return fmt.Errorf("ошибка при запросе к базе личеса: %w", err)
+			}
+
+			lichess = fmt.Sprintf("пиковые рейтинги на личесе: блиц %d, рапид %d, классика %d", lichessTopRatings.Blitz, lichessTopRatings.Rapid, lichessTopRatings.Classical)
 		}
-		chesscomTopRatings, err := utils.GetChessComAllTimeHigh(user.ChessCom)
-		if err != nil {
-			return fmt.Errorf("ошибка при запросе к базе чесскома: %w", err)
+		if user.ChessCom != nil {
+			chesscomUsername = *user.ChessCom
+			chesscomTopRatings, err := utils.GetChessComAllTimeHigh(chesscomUsername)
+			if err != nil {
+				return fmt.Errorf("ошибка при запросе к базе чесскома: %w", err)
+			}
+			chesscom = fmt.Sprintf("пиковые рейтинги на чесскоме: блиц %d, рапид %d, классика %d", chesscomTopRatings.Blitz, chesscomTopRatings.Rapid, chesscomTopRatings.Classical)
 		}
-		lichess = fmt.Sprintf("пиковые рейтинги на личесе: блиц %d, рапид %d, классика %d", lichessTopRatings.Blitz, lichessTopRatings.Rapid, lichessTopRatings.Classical)
-		chesscom = fmt.Sprintf("пиковые рейтинги на чесскоме: блиц %d, рапид %d, классика %d", chesscomTopRatings.Blitz, chesscomTopRatings.Rapid, chesscomTopRatings.Classical)
 
 		return b.SendMessage(chatID, fmt.Sprintf("%s\n%s", lichess, chesscom))
 	}

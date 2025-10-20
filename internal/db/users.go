@@ -81,10 +81,16 @@ func UpdateLichess(chatID int64, lichess string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	var value *string
+	if lichess == "" {
+		return fmt.Errorf("update lichess with ''")
+	}
+	value = &lichess
+
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("lichess", lichess)
+		Update("lichess", value)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to update lichess: %w", result.Error)
@@ -101,10 +107,16 @@ func UpdateChessCom(chatID int64, chessCom string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	var value *string
+	if chessCom == "" {
+		return fmt.Errorf("update chesscom with ''")
+	}
+	value = &chessCom
+
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("chesscom", chessCom)
+		Update("chesscom", value)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to update chesscom: %w", result.Error)
@@ -234,11 +246,11 @@ func Stringify(u User, markdown bool) string {
 	if u.SavedName != "" {
 		builder.WriteString(fmt.Sprintf("ник: %s\n", u.SavedName))
 	}
-	if u.Lichess != "" {
-		builder.WriteString(fmt.Sprintf("lichess.org/@/%s\n", u.Lichess))
+	if u.Lichess != nil && *u.Lichess != "" {
+		builder.WriteString(fmt.Sprintf("lichess.org/@/%s\n", *u.Lichess))
 	}
-	if u.ChessCom != "" {
-		builder.WriteString(fmt.Sprintf("chess.com/member/%s\n", u.ChessCom))
+	if u.ChessCom != nil && *u.ChessCom != "" {
+		builder.WriteString(fmt.Sprintf("chess.com/member/%s\n", *u.ChessCom))
 	}
 
 	return builder.String()
