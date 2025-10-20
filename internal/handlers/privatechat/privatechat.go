@@ -164,11 +164,8 @@ func handleMyRatings(b *bot.Bot, update tgbotapi.Update) error {
 			chesscom = "чесском не указан"
 		}
 
-		var lichessUsername, chesscomUsername string
 		if user.Lichess != nil {
-			lichessUsername = *user.Lichess
-
-			lichessTopRatings, err := utils.GetLichessAllTimeHigh(lichessUsername)
+			lichessTopRatings, err := utils.GetLichessAllTimeHigh(*user.Lichess)
 			if err != nil {
 				return fmt.Errorf("ошибка при запросе к базе личеса: %w", err)
 			}
@@ -176,8 +173,7 @@ func handleMyRatings(b *bot.Bot, update tgbotapi.Update) error {
 			lichess = fmt.Sprintf("пиковые рейтинги на личесе: блиц %d, рапид %d, классика %d", lichessTopRatings.Blitz, lichessTopRatings.Rapid, lichessTopRatings.Classical)
 		}
 		if user.ChessCom != nil {
-			chesscomUsername = *user.ChessCom
-			chesscomTopRatings, err := utils.GetChessComAllTimeHigh(chesscomUsername)
+			chesscomTopRatings, err := utils.GetChessComAllTimeHigh(*user.ChessCom)
 			if err != nil {
 				return fmt.Errorf("ошибка при запросе к базе чесскома: %w", err)
 			}
