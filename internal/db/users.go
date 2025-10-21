@@ -255,3 +255,87 @@ func Stringify(u User, markdown bool) string {
 
 	return builder.String()
 }
+
+// UpdateLichessAndState updates lichess username and state in one transaction
+func UpdateLichessAndState(chatID int64, lichess string, newState State) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if lichess == "" {
+		return fmt.Errorf("update lichess with ''")
+	}
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Updates(map[string]interface{}{
+			"lichess": &lichess,
+			"state":   newState,
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update lichess and state: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+// UpdateChessComAndState updates chess.com username and state in one transaction
+func UpdateChessComAndState(chatID int64, chessCom string, newState State) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if chessCom == "" {
+		return fmt.Errorf("update chesscom with ''")
+	}
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Updates(map[string]interface{}{
+			"chesscom": &chessCom,
+			"state":    newState,
+		})
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to update chesscom and state: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+// GetOrCreateUser combines getting and creating user in one operation
+func GetOrCreateUser(update tgbotapi.Update) (User, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	message := update.Message
+	userName := message.From.UserName
+	tgName := strings.TrimSpace(message.From.FirstName + " " + message.From.LastName)
+
+	user := User{
+		ChatID:   message.Chat.ID,
+		Username: userName,
+		TgName:   tgName,
+	}
+
+	result := Database.WithContext(ctx).Where(User{ChatID: message.Chat.ID}).FirstOrCreate(&user)
+	if result.Error != nil {
+		return User{}, false, fmt.Errorf("failed to get/create user: %w", result.Error)
+	}
+
+	isNew := result.RowsAffected > 0
+	if isNew {
+		log.Printf("new user registered: id: %d, username: %s", message.Chat.ID, userName)
+	}
+
+	return user, isNew, nil
+}

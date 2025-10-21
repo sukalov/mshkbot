@@ -32,34 +32,28 @@ func GetHandlers() bot.HandlerSet {
 func handleStart(b *bot.Bot, update tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 
-	// check user state
-	state, err := db.GetUserState(chatID)
+	// Get or create user in one operation
+	user, isNew, err := db.GetOrCreateUser(update)
 	if err != nil {
-		log.Printf("failed to get user state: %v", err)
-		// user doesn't exist yet, continue with registration
-	} else {
-		// user exists, check their state
-		switch state {
+		log.Printf("failed to get/create user: %v", err)
+		return err
+	}
+
+	if !isNew {
+		// User exists, check their state
+		switch user.State {
 		case db.StateCompleted:
 			return b.SendMessage(chatID, "вы уже зарегистрированы!")
-
 		case db.StateAskedLichess:
-			platform := "lichess"
-			return b.SendMessage(chatID, fmt.Sprintf("введите ваш никнейм на %s:", platform))
-
+			return b.SendMessage(chatID, "введите ваш никнейм на lichess:")
 		case db.StateAskedChessCom:
-			platform := "chess.com"
-			return b.SendMessage(chatID, fmt.Sprintf("введите ваш никнейм на %s:", platform))
-
+			return b.SendMessage(chatID, "введите ваш никнейм на chess.com:")
 		case db.StateAskedSavedName:
 			return b.SendMessage(chatID, "введите ваш никнейм для турниров:")
 		}
 	}
 
-	if err := db.Register(update); err != nil {
-		log.Printf("failed to register user: %v", err)
-	}
-
+	// Show registration options for new users
 	row := []tgbotapi.InlineKeyboardButton{
 		tgbotapi.NewInlineKeyboardButtonData("lichess", "register:lichess"),
 		tgbotapi.NewInlineKeyboardButtonData("chess.com", "register:chess.com"),
@@ -192,7 +186,7 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 
 	// get user state
-	state, err := db.GetUserState(chatID)
+	state, err := db.GetUserState(chatID)  // DB CALL 1
 	if err != nil {
 		log.Printf("failed to get user state: %v", err)
 		return nil
@@ -212,13 +206,13 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 		log.Printf("all time high: %d", allTimeHigh)
 
 		// save the username
-		if err := db.UpdateLichess(chatID, username); err != nil {
+		if err := db.UpdateLichess(chatID, username); err != nil {  // DB CALL 2
 			log.Printf("failed to update lichess username: %v", err)
 			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
 		}
 
 		// ask for saved name
-		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil {
+		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil {  // DB CALL 3
 			return fmt.Errorf("failed to update state: %w", err)
 		}
 
