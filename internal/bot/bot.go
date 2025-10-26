@@ -127,8 +127,11 @@ func (b *Bot) routeUpdate(
 	var handlers HandlerSet
 	var chatType string
 
+	log.Printf("chatid, maingroupid: %d, %d", chatID, b.mainGroupID)
+
 	switch {
 	case chatID == b.mainGroupID:
+		log.Printf("[%s] main group message: %s", b.name, update.Message.Text)
 		handlers = mainGroupHandlers
 		chatType = "main group"
 	case chatID == b.adminGroupID:

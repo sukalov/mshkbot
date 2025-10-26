@@ -11,9 +11,9 @@ import (
 func GetHandlers() bot.HandlerSet {
 	return bot.HandlerSet{
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-			"start":  handleStart,
-			"help":   handleHelp,
-			"status": handleStatus,
+			"checkin":  handleCheckIn,
+			"checkout": handleCheckOut,
+			"help":     handleHelp,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handleRegularMessage,
@@ -24,16 +24,16 @@ func GetHandlers() bot.HandlerSet {
 	}
 }
 
-func handleStart(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "welcome to main group!")
-}
-
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.Message.Chat.ID, "main group help text")
 }
 
-func handleStatus(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "main group status")
+func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
+	return b.SendMessage(update.Message.Chat.ID, "check in")
+}
+
+func handleCheckOut(b *bot.Bot, update tgbotapi.Update) error {
+	return b.SendMessage(update.Message.Chat.ID, "check out")
 }
 
 func handleRegularMessage(b *bot.Bot, update tgbotapi.Update) error {
