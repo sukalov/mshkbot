@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -142,4 +143,25 @@ func GetChessComAllTimeHigh(username string) (TopRatings, error) {
 	}
 
 	return topRatings, nil
+}
+
+func ApproveEmoji() string {
+	n := rand.Intn(100)
+
+	if n < 3 {
+		return "🎉"
+	}
+
+	remaining := (n - 3) % 4
+
+	switch remaining {
+	case 0:
+		return "👍"
+	case 1:
+		return "👌"
+	case 2:
+		return "🫡"
+	default:
+		return "🤝"
+	}
 }

@@ -185,14 +185,13 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 
 	chatID := update.Message.Chat.ID
 
-	// get user state
-	state, err := db.GetUserState(chatID)  // DB CALL 1
+	user, err := db.GetUser(chatID) // DB CALL 1
 	if err != nil {
 		log.Printf("failed to get user state: %v", err)
 		return nil
 	}
 
-	switch state {
+	switch user.State {
 	case db.StateAskedLichess:
 		username := strings.TrimPrefix(strings.TrimSpace(update.Message.Text), "@")
 		if username == "" {
@@ -201,18 +200,18 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 
 		allTimeHigh, err := utils.GetLichessAllTimeHigh(username)
 		if err != nil {
-			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
+			return b.SendMessage(chatID, "произошла ошибка, попробуйте ещё раз")
 		}
 		log.Printf("all time high: %d", allTimeHigh)
 
 		// save the username
-		if err := db.UpdateLichess(chatID, username); err != nil {  // DB CALL 2
+		if err := db.UpdateLichess(chatID, username); err != nil { // DB CALL 2
 			log.Printf("failed to update lichess username: %v", err)
-			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
+			return b.SendMessage(chatID, fmt.Sprintf("произошла ошибка, попробуйте ещё раз: %v", err))
 		}
 
 		// ask for saved name
-		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil {  // DB CALL 3
+		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil { // DB CALL 3
 			return fmt.Errorf("failed to update state: %w", err)
 		}
 

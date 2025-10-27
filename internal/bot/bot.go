@@ -1,11 +1,28 @@
 package bot
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+// reactionType represents a reaction type for telegram API
+type reactionType struct {
+	Type  string `json:"type"`
+	Emoji string `json:"emoji,omitempty"`
+}
+
+type setMessageReactionRequest struct {
+	ChatID    int64          `json:"chat_id"`
+	MessageID int            `json:"message_id"`
+	Reaction  []reactionType `json:"reaction,omitempty"`
+	IsBig     bool           `json:"is_big,omitempty"`
+}
 
 type Bot struct {
 	Client       *tgbotapi.BotAPI
@@ -94,8 +111,7 @@ func (b *Bot) refreshAdminList() {
 	}
 }
 
-// isAdmin checks if user id is in admin list
-func (b *Bot) isAdmin(userID int64) bool {
+func (b *Bot) IsAdmin(userID int64) bool {
 	b.adminMu.RLock()
 	defer b.adminMu.RUnlock()
 	return b.adminUserIDs[userID]
@@ -109,15 +125,12 @@ func (b *Bot) routeUpdate(
 	privateHandlers HandlerSet,
 ) {
 	var chatID int64
-	var userID int64
 
 	// determine chat id and user id from update
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
-		userID = update.Message.From.ID
 	} else if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
 		chatID = update.CallbackQuery.Message.Chat.ID
-		userID = update.CallbackQuery.From.ID
 	} else {
 		log.Printf("[%s] update has no chat id", b.name)
 		return
@@ -139,13 +152,12 @@ func (b *Bot) routeUpdate(
 		chatType = "admin group"
 	case chatID > 0: // private chat
 		// check if user is admin - route to admin handlers if true
-		if b.isAdmin(userID) {
-			handlers = adminGroupHandlers
-			chatType = "private (admin)"
-		} else {
-			handlers = privateHandlers
-			chatType = "private"
-		}
+		// if b.isAdmin(userID) {
+		// handlers = adminGroupHandlers
+		// chatType = "private (admin)"
+		// } else {
+		handlers = privateHandlers
+		chatType = "private"
 	default:
 		log.Printf("[%s] unrecognized chat id: %d", b.name, chatID)
 		return
@@ -156,18 +168,17 @@ func (b *Bot) routeUpdate(
 }
 
 // handles incoming updates with provided handler set
-func (b *Bot) processUpdate(update tgbotapi.Update, handlers HandlerSet) {
+func (b *Bot) processUpdate(update tgbotapi.Update, handlers HandlerSet) error {
 	// handle command updates
 	if update.Message != nil && update.Message.IsCommand() {
 		command := update.Message.Command()
 		if handler, exists := handlers.Commands[command]; exists {
 			if err := handler(b, update); err != nil {
-				log.Printf("[%s] command handler error for /%s: %v", b.name, command, err)
+				return b.SendMessage(update.Message.From.ID, fmt.Sprintf("ошибка при выполнении команды %s", command))
 			}
-			return
+			return nil
 		}
-		log.Printf("[%s] unhandled command: /%s", b.name, command)
-		return
+		return b.SendMessage(update.Message.From.ID, fmt.Sprintf("неизвестная команда: /%s", command))
 	}
 
 	// handle callback queries
@@ -184,9 +195,9 @@ func (b *Bot) processUpdate(update tgbotapi.Update, handlers HandlerSet) {
 
 		if handler, exists := handlers.Callbacks[query]; exists {
 			if err := handler(b, update); err != nil {
-				log.Printf("[%s] callback handler error for %s: %v", b.name, query, err)
+				return b.SendMessage(update.Message.From.ID, "ошибка")
 			}
-			return
+			return nil
 		}
 
 		log.Printf("[%s] unhandled callback: %s", b.name, query)
@@ -194,7 +205,7 @@ func (b *Bot) processUpdate(update tgbotapi.Update, handlers HandlerSet) {
 		if update.CallbackQuery.Message != nil && update.CallbackQuery.Message.Chat.ID > 0 {
 			b.SendMessage(update.CallbackQuery.Message.Chat.ID, "команда не распознана")
 		}
-		return
+		return nil
 	}
 
 	// run generic message handlers
@@ -203,6 +214,7 @@ func (b *Bot) processUpdate(update tgbotapi.Update, handlers HandlerSet) {
 			log.Printf("[%s] message handler error: %v", b.name, err)
 		}
 	}
+	return nil
 }
 
 // halts the bot
@@ -241,21 +253,104 @@ func (b *Bot) SendMessageWithButtons(
 	return err
 }
 
-func (b *Bot) SendMessageWithButtonsNoLinks(
-	chatID int64,
-	text string,
-	keyboard tgbotapi.InlineKeyboardMarkup,
-) error {
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyMarkup = keyboard
-	msg.ParseMode = "Markdown"
-	msg.DisableWebPagePreview = true
-
-	_, err := b.Client.Send(msg)
-	return err
-}
-
-// plain request to telegram API
 func (b *Bot) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
 	return b.Client.Request(c)
+}
+
+// removeReaction removes all reactions from a message
+func (b *Bot) RemoveReaction(chatID int64, messageID int) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/setMessageReaction", b.Client.Token)
+
+	reqBody := setMessageReactionRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Reaction:  []reactionType{}, // empty array removes reactions
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
+}
+
+// giveReaction sends a reaction to a message using direct telegram API call
+func (b *Bot) GiveReaction(chatID int64, messageID int, emoji string) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/setMessageReaction", b.Client.Token)
+
+	reqBody := setMessageReactionRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Reaction: []reactionType{
+			{
+				Type:  "emoji",
+				Emoji: emoji,
+			},
+		},
+		IsBig: false,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
+}
+
+// replyToMessage sends a text message as a reply to a specific message
+func (b *Bot) ReplyToMessage(chatID int64, messageID int, text string) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", b.Client.Token)
+
+	reqBody := map[string]interface{}{
+		"chat_id": chatID,
+		"text":    text,
+		"reply_parameters": map[string]interface{}{
+			"message_id": messageID,
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
 }

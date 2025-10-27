@@ -203,7 +203,7 @@ func GetAll() ([]User, error) {
 	return users, nil
 }
 
-func GetUserState(chatID int64) (State, error) {
+func GetUser(chatID int64) (User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -215,12 +215,12 @@ func GetUserState(chatID int64) (State, error) {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return "", fmt.Errorf("user not found: %d", chatID)
+			return User{}, fmt.Errorf("user not found")
 		}
-		return "", fmt.Errorf("failed to get user state: %w", result.Error)
+		return User{}, fmt.Errorf("failed to get user state: %w", result.Error)
 	}
 
-	return user.State, nil
+	return user, nil
 }
 
 // Delete removes a user by chat ID
