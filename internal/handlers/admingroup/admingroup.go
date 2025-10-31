@@ -1,17 +1,22 @@
 package admingroup
 
 import (
+	"context"
+	"fmt"
 	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/mshkbot/internal/bot"
+	"github.com/sukalov/mshkbot/internal/utils"
 )
 
 // GetHandlers returns handler set for admin group
 func GetHandlers() bot.HandlerSet {
 	return bot.HandlerSet{
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-			"start": handleStart,
+			"help":              handleHelp,
+			"tournament":        handleTournament,
+			"create_tournament": handleCreateTournament,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handleAdminMessage,
@@ -20,8 +25,27 @@ func GetHandlers() bot.HandlerSet {
 	}
 }
 
-func handleStart(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "admin start handler")
+func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
+	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир")
+}
+
+func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
+	jsonStr, err := b.Tournament.GetTournamentJSON()
+	if err != nil {
+		return err
+	}
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, fmt.Sprintf("```json\n%s```", jsonStr), true)
+}
+
+func handleCreateTournament(b *bot.Bot, update tgbotapi.Update) error {
+	ctx := context.Background()
+	if b.Tournament.Exists {
+		return b.SendMessage(update.Message.Chat.ID, "турнир уже создан")
+	}
+	if err := b.Tournament.CreateTournament(ctx, 26, 0); err != nil {
+		return err
+	}
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())
 }
 
 func handleAdminMessage(b *bot.Bot, update tgbotapi.Update) error {

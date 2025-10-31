@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sukalov/mshkbot/internal/tournament"
 )
 
 // reactionType represents a reaction type for telegram API
@@ -34,6 +35,7 @@ type Bot struct {
 	adminGroupID int64
 	adminUserIDs map[int64]bool
 	adminMu      sync.RWMutex
+	Tournament   *tournament.TournamentManager
 }
 
 // creates a new bot instance
@@ -55,6 +57,7 @@ func New(name, token string, mainGroupID, adminGroupID int64) (*Bot, error) {
 		mainGroupID:  mainGroupID,
 		adminGroupID: adminGroupID,
 		adminUserIDs: make(map[int64]bool),
+		Tournament:   &tournament.TournamentManager{},
 	}, nil
 }
 
@@ -72,7 +75,10 @@ func (b *Bot) Start(
 	privateHandlers HandlerSet,
 ) {
 	log.Printf("[%s] authorized on account %s", b.name, b.Client.Self.UserName)
-
+	if err := b.Tournament.Init(); err != nil {
+		log.Printf("[%s] failed to initialize tournament: %v", b.name, err)
+	}
+	log.Printf("[%s] tournament initialized: %v", b.name, b.Tournament)
 	// fetch admin list on startup
 	b.refreshAdminList()
 
@@ -150,12 +156,7 @@ func (b *Bot) routeUpdate(
 	case chatID == b.adminGroupID:
 		handlers = adminGroupHandlers
 		chatType = "admin group"
-	case chatID > 0: // private chat
-		// check if user is admin - route to admin handlers if true
-		// if b.isAdmin(userID) {
-		// handlers = adminGroupHandlers
-		// chatType = "private (admin)"
-		// } else {
+	case chatID > 0:
 		handlers = privateHandlers
 		chatType = "private"
 	default:

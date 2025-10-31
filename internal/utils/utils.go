@@ -145,7 +145,7 @@ func GetChessComAllTimeHigh(username string) (TopRatings, error) {
 	return topRatings, nil
 }
 
-func ApproveEmoji() string {
+func RandomApproveEmoji() string {
 	n := rand.Intn(100)
 
 	if n < 3 {
@@ -163,5 +163,20 @@ func ApproveEmoji() string {
 		return "🫡"
 	default:
 		return "🤝"
+	}
+}
+
+func RandomAlreadyCheckedInMessage() string {
+	n := rand.Intn(4)
+
+	switch n {
+	case 0:
+		return "вы уже записаны на турнир"
+	case 1:
+		return "хватит тыкать, вы уже записаны"
+	case 2:
+		return "второй раз записаться нельзя"
+	default:
+		return "достаточно записаться один раз"
 	}
 }

@@ -39,6 +39,7 @@ func (s *Scheduler) Start() {
 
 	s.scheduleWeekly(time.Monday, 12, 0, s.mondayTask)
 	s.scheduleWeekly(time.Wednesday, 12, 30, s.wednesdayTask)
+	s.scheduleWeekly(time.Friday, 16, 15, s.randomTask)
 }
 
 func (s *Scheduler) Stop() {
@@ -115,5 +116,13 @@ func (s *Scheduler) wednesdayTask() {
 
 	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
 		log.Printf("failed to send wednesday message: %v", err)
+	}
+}
+
+func (s *Scheduler) randomTask() {
+	message := "ТУРНИР НАЧАЛСЯ!!!"
+
+	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
+		log.Printf("failed to send monday message: %v", err)
 	}
 }
