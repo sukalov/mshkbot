@@ -37,7 +37,7 @@ func GetHandlers() bot.HandlerSet {
 }
 
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир\n\n/suspend_from_green - отстранить пользователя от зелёных турниров\n\n/ban_player - забанить пользователя\n\n/unban_player - разбанить пользователя\n\n/admit_to_green - допустить пользователя к зелёным турнирам")
+	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир\n\n/suspend_from_green - отстранить пользователя от зелёных турниров\n\n/admit_to_green - допустить пользователя к зелёным турнирам\n\n/ban_player - забанить пользователя\n\n/unban_player - разбанить пользователя")
 }
 
 func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
@@ -290,5 +290,5 @@ func handleUnbanPlayer(b *bot.Bot, update tgbotapi.Update) error {
 func handleAdmitToGreen(b *bot.Bot, update tgbotapi.Update) error {
 	adminChatID := update.Message.From.ID
 	b.SetAdminProcess(adminChatID, bot.ProcessTypeAdmitToGreen, "")
-	return b.SendMessage(update.Message.Chat.ID, "введите telegram username пользователя для допуска к зелёным турнирам:")
+	return b.SendMessage(update.Message.Chat.ID, "учтите, игрок всё равно может не пройти по рейтингу. эта команда просто снимет внутрней бан.\n\nвведите telegram_username пользователя для допуска к зелёным турнирам:")
 }
