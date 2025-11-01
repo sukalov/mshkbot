@@ -57,6 +57,23 @@ func GetByChatID(chatID int64) (User, error) {
 	return user, nil
 }
 
+func GetByUsername(username string) (User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user User
+	result := Database.WithContext(ctx).Where("username = ?", username).First(&user)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return User{}, fmt.Errorf("user not found")
+		}
+		return User{}, fmt.Errorf("failed to retrieve user: %w", result.Error)
+	}
+
+	return user, nil
+}
+
 func UpdateSavedName(chatID int64, newName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -149,14 +166,14 @@ func UpdateState(chatID int64, state State) error {
 	return nil
 }
 
-func SetBanned(chatID int64, isBanned bool) error {
+func SetBannedUntil(chatID int64, until *time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("is_banned", isBanned)
+		Update("banned_until", until)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to update ban status: %w", result.Error)
@@ -169,14 +186,14 @@ func SetBanned(chatID int64, isBanned bool) error {
 	return nil
 }
 
-func SetNotGreen(chatID int64, isNotGreen bool) error {
+func SetNotGreenUntil(chatID int64, until *time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result := Database.WithContext(ctx).
 		Model(&User{}).
 		Where("chat_id = ?", chatID).
-		Update("is_not_green", isNotGreen)
+		Update("not_green_until", until)
 
 	if result.Error != nil {
 		return fmt.Errorf("failed to update green status: %w", result.Error)

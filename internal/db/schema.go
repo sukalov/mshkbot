@@ -9,16 +9,16 @@ import (
 
 // User represents a telegram user
 type User struct {
-	ChatID     int64     `gorm:"primaryKey;column:chat_id"`
-	Username   string    `gorm:"column:username;index"`
-	TgName     string    `gorm:"column:tg_name"`
-	SavedName  string    `gorm:"column:saved_name"`
-	Lichess    *string   `gorm:"column:lichess;unique"`
-	ChessCom   *string   `gorm:"column:chesscom;unique"`
-	IsBanned   bool      `gorm:"column:is_banned;default:false"`
-	IsNotGreen bool      `gorm:"column:is_not_green"`
-	State      State     `gorm:"column:state"`
-	AddedAt    time.Time `gorm:"column:added_at;autoCreateTime"`
+	ChatID        int64      `gorm:"primaryKey;autoIncrement:false;column:chat_id"`
+	Username      string     `gorm:"column:username;index"`
+	TgName        string     `gorm:"column:tg_name"`
+	SavedName     string     `gorm:"column:saved_name"`
+	Lichess       *string    `gorm:"column:lichess;unique"`
+	ChessCom      *string    `gorm:"column:chesscom;unique"`
+	BannedUntil   *time.Time `gorm:"column:banned_until"`
+	NotGreenUntil *time.Time `gorm:"column:not_green_until"`
+	State         State      `gorm:"column:state"`
+	AddedAt       time.Time  `gorm:"column:added_at;autoCreateTime"`
 }
 
 type State string

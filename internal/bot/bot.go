@@ -25,17 +25,31 @@ type setMessageReactionRequest struct {
 	IsBig     bool           `json:"is_big,omitempty"`
 }
 
+type SuspensionProcess struct {
+	AdminChatID int64
+	Duration    string
+}
+
+type BanProcess struct {
+	AdminChatID int64
+	Duration    string
+}
+
 type Bot struct {
-	Client       *tgbotapi.BotAPI
-	updateChan   tgbotapi.UpdatesChannel
-	stopChan     chan struct{}
-	name         string
-	mu           sync.Mutex
-	mainGroupID  int64
-	adminGroupID int64
-	adminUserIDs map[int64]bool
-	adminMu      sync.RWMutex
-	Tournament   *tournament.TournamentManager
+	Client            *tgbotapi.BotAPI
+	updateChan        tgbotapi.UpdatesChannel
+	stopChan          chan struct{}
+	name              string
+	mu                sync.Mutex
+	mainGroupID       int64
+	adminGroupID      int64
+	adminUserIDs      map[int64]bool
+	adminMu           sync.RWMutex
+	Tournament        *tournament.TournamentManager
+	suspensionProcess map[int64]*SuspensionProcess
+	suspensionMu      sync.RWMutex
+	banProcess        map[int64]*BanProcess
+	banMu             sync.RWMutex
 }
 
 // creates a new bot instance
@@ -50,14 +64,16 @@ func New(name, token string, mainGroupID, adminGroupID int64) (*Bot, error) {
 	updateChan := botClient.GetUpdatesChan(updateConfig)
 
 	return &Bot{
-		Client:       botClient,
-		updateChan:   updateChan,
-		stopChan:     make(chan struct{}),
-		name:         name,
-		mainGroupID:  mainGroupID,
-		adminGroupID: adminGroupID,
-		adminUserIDs: make(map[int64]bool),
-		Tournament:   &tournament.TournamentManager{},
+		Client:            botClient,
+		updateChan:        updateChan,
+		stopChan:          make(chan struct{}),
+		name:              name,
+		mainGroupID:       mainGroupID,
+		adminGroupID:      adminGroupID,
+		adminUserIDs:      make(map[int64]bool),
+		Tournament:        &tournament.TournamentManager{},
+		suspensionProcess: make(map[int64]*SuspensionProcess),
+		banProcess:        make(map[int64]*BanProcess),
 	}, nil
 }
 
@@ -452,4 +468,48 @@ func (b *Bot) UnpinMessage(chatID int64, messageID int) error {
 	}
 
 	return nil
+}
+
+func (b *Bot) SetSuspensionProcess(adminChatID int64, duration string) {
+	b.suspensionMu.Lock()
+	defer b.suspensionMu.Unlock()
+	b.suspensionProcess[adminChatID] = &SuspensionProcess{
+		AdminChatID: adminChatID,
+		Duration:    duration,
+	}
+}
+
+func (b *Bot) GetSuspensionProcess(adminChatID int64) (*SuspensionProcess, bool) {
+	b.suspensionMu.RLock()
+	defer b.suspensionMu.RUnlock()
+	process, exists := b.suspensionProcess[adminChatID]
+	return process, exists
+}
+
+func (b *Bot) ClearSuspensionProcess(adminChatID int64) {
+	b.suspensionMu.Lock()
+	defer b.suspensionMu.Unlock()
+	delete(b.suspensionProcess, adminChatID)
+}
+
+func (b *Bot) SetBanProcess(adminChatID int64, duration string) {
+	b.banMu.Lock()
+	defer b.banMu.Unlock()
+	b.banProcess[adminChatID] = &BanProcess{
+		AdminChatID: adminChatID,
+		Duration:    duration,
+	}
+}
+
+func (b *Bot) GetBanProcess(adminChatID int64) (*BanProcess, bool) {
+	b.banMu.RLock()
+	defer b.banMu.RUnlock()
+	process, exists := b.banProcess[adminChatID]
+	return process, exists
+}
+
+func (b *Bot) ClearBanProcess(adminChatID int64) {
+	b.banMu.Lock()
+	defer b.banMu.Unlock()
+	delete(b.banProcess, adminChatID)
 }
