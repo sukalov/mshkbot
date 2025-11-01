@@ -23,6 +23,8 @@ func GetHandlers() bot.HandlerSet {
 			"remove_tournament":  handleRemoveTournament,
 			"suspend_from_green": handleSuspendFromGreen,
 			"ban_player":         handleBanPlayer,
+			"unban_player":       handleUnbanPlayer,
+			"admit_to_green":     handleAdmitToGreen,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handleAdminMessage,
@@ -35,7 +37,7 @@ func GetHandlers() bot.HandlerSet {
 }
 
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир\n\n/suspend_from_green - отстранить пользователя от зелёных турниров\n\n/ban_player - забанить пользователя")
+	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир\n\n/suspend_from_green - отстранить пользователя от зелёных турниров\n\n/ban_player - забанить пользователя\n\n/unban_player - разбанить пользователя\n\n/admit_to_green - допустить пользователя к зелёным турнирам")
 }
 
 func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
@@ -81,33 +83,30 @@ func handleAdminMessage(b *bot.Bot, update tgbotapi.Update) error {
 
 	adminChatID := update.Message.From.ID
 
-	suspendProcess, suspendExists := b.GetSuspensionProcess(adminChatID)
-	banProcess, banExists := b.GetBanProcess(adminChatID)
-
-	if !suspendExists && !banExists {
+	process, exists := b.GetAdminProcess(adminChatID)
+	if !exists {
 		log.Printf("admin group message: %s", update.Message.Text)
 		return nil
 	}
 
 	username := strings.TrimPrefix(strings.TrimSpace(update.Message.Text), "@")
 	if username == "" {
-		b.ClearSuspensionProcess(adminChatID)
-		b.ClearBanProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 		return b.SendMessage(update.Message.Chat.ID, "юзернейм не может быть пустым")
 	}
 
 	user, err := db.GetByUsername(username)
 	if err != nil {
-		b.ClearSuspensionProcess(adminChatID)
-		b.ClearBanProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("пользователь с юзернеймом %s не найден", username))
 	}
 
 	var until *time.Time
 	now := time.Now().UTC()
 
-	if suspendExists {
-		switch suspendProcess.Duration {
+	switch process.Type {
+	case bot.ProcessTypeSuspension:
+		switch process.Duration {
 		case "month":
 			t := now.AddDate(0, 1, 0)
 			until = &t
@@ -115,27 +114,26 @@ func handleAdminMessage(b *bot.Bot, update tgbotapi.Update) error {
 			t := now.AddDate(100, 0, 0)
 			until = &t
 		default:
-			b.ClearSuspensionProcess(adminChatID)
+			b.ClearAdminProcess(adminChatID)
 			return b.SendMessage(update.Message.Chat.ID, "неизвестная длительность")
 		}
 
 		if err := db.SetNotGreenUntil(user.ChatID, until); err != nil {
-			b.ClearSuspensionProcess(adminChatID)
+			b.ClearAdminProcess(adminChatID)
 			return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при обновлении статуса: %v", err))
 		}
 
-		b.ClearSuspensionProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 
 		durationText := "навсегда"
-		if suspendProcess.Duration == "month" {
+		if process.Duration == "month" {
 			durationText = "на месяц"
 		}
 
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("пользователь %s отстранён от зелёных %s", username, durationText))
-	}
 
-	if banExists {
-		switch banProcess.Duration {
+	case bot.ProcessTypeBan:
+		switch process.Duration {
 		case "month":
 			t := now.AddDate(0, 1, 0)
 			until = &t
@@ -143,23 +141,43 @@ func handleAdminMessage(b *bot.Bot, update tgbotapi.Update) error {
 			t := now.AddDate(100, 0, 0)
 			until = &t
 		default:
-			b.ClearBanProcess(adminChatID)
+			b.ClearAdminProcess(adminChatID)
 			return b.SendMessage(update.Message.Chat.ID, "неизвестная длительность")
 		}
 
 		if err := db.SetBannedUntil(user.ChatID, until); err != nil {
-			b.ClearBanProcess(adminChatID)
+			b.ClearAdminProcess(adminChatID)
 			return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при обновлении статуса: %v", err))
 		}
 
-		b.ClearBanProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 
 		durationText := "навсегда"
-		if banProcess.Duration == "month" {
+		if process.Duration == "month" {
 			durationText = "на месяц"
 		}
 
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("пользователь %s забанен %s", username, durationText))
+
+	case bot.ProcessTypeUnban:
+		if err := db.SetBannedUntil(user.ChatID, nil); err != nil {
+			b.ClearAdminProcess(adminChatID)
+			return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при обновлении статуса: %v", err))
+		}
+
+		b.ClearAdminProcess(adminChatID)
+
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("пользователь %s разбанен", username))
+
+	case bot.ProcessTypeAdmitToGreen:
+		if err := db.SetNotGreenUntil(user.ChatID, nil); err != nil {
+			b.ClearAdminProcess(adminChatID)
+			return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при обновлении статуса: %v", err))
+		}
+
+		b.ClearAdminProcess(adminChatID)
+
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("пользователь %s допущен к зелёным турнирам", username))
 	}
 
 	return nil
@@ -198,14 +216,14 @@ func handleSuspendDuration(b *bot.Bot, update tgbotapi.Update) error {
 	duration := parts[1]
 
 	if duration == "cancel" {
-		b.ClearSuspensionProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 		if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "отменено"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		return nil
 	}
 
-	b.SetSuspensionProcess(adminChatID, duration)
+	b.SetAdminProcess(adminChatID, bot.ProcessTypeSuspension, duration)
 
 	if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "введите telegram username пользователя:"); err != nil {
 		return fmt.Errorf("failed to edit message: %w", err)
@@ -247,18 +265,30 @@ func handleBanDuration(b *bot.Bot, update tgbotapi.Update) error {
 	duration := parts[1]
 
 	if duration == "cancel" {
-		b.ClearBanProcess(adminChatID)
+		b.ClearAdminProcess(adminChatID)
 		if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "отменено"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		return nil
 	}
 
-	b.SetBanProcess(adminChatID, duration)
+	b.SetAdminProcess(adminChatID, bot.ProcessTypeBan, duration)
 
 	if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "введите telegram username пользователя:"); err != nil {
 		return fmt.Errorf("failed to edit message: %w", err)
 	}
 
 	return nil
+}
+
+func handleUnbanPlayer(b *bot.Bot, update tgbotapi.Update) error {
+	adminChatID := update.Message.From.ID
+	b.SetAdminProcess(adminChatID, bot.ProcessTypeUnban, "")
+	return b.SendMessage(update.Message.Chat.ID, "введите telegram username пользователя для разбана:")
+}
+
+func handleAdmitToGreen(b *bot.Bot, update tgbotapi.Update) error {
+	adminChatID := update.Message.From.ID
+	b.SetAdminProcess(adminChatID, bot.ProcessTypeAdmitToGreen, "")
+	return b.SendMessage(update.Message.Chat.ID, "введите telegram username пользователя для допуска к зелёным турнирам:")
 }
