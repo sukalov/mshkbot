@@ -46,7 +46,7 @@ func handleCreateTournament(b *bot.Bot, update tgbotapi.Update) error {
 	if err := b.Tournament.CreateTournament(ctx, 26, 0, 0); err != nil {
 		return err
 	}
-	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.ApproveEmoji())
 }
 
 func handleRemoveTournament(b *bot.Bot, update tgbotapi.Update) error {
@@ -63,7 +63,7 @@ func handleRemoveTournament(b *bot.Bot, update tgbotapi.Update) error {
 	if err := b.Tournament.RemoveTournament(ctx); err != nil {
 		return err
 	}
-	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.ApproveEmoji())
 }
 
 func handleAdminMessage(b *bot.Bot, update tgbotapi.Update) error {

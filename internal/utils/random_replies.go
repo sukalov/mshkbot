@@ -4,14 +4,14 @@ import (
 	"math/rand"
 )
 
-func RandomApproveEmoji() string {
+func ApproveEmoji() string {
 	n := rand.Intn(100)
 
 	if n < 2 {
 		return "🎉"
 	}
 
-	remaining := (n - 2) % 4
+	remaining := (n - 2) % 5
 
 	switch remaining {
 	case 0:
@@ -20,12 +20,14 @@ func RandomApproveEmoji() string {
 		return "👌"
 	case 2:
 		return "🫡"
+	case 3:
+		return "✍️"
 	default:
 		return "🤝"
 	}
 }
 
-func RandomAlreadyCheckedInMessage() string {
+func AlreadyCheckedInMessage() string {
 	n := rand.Intn(4)
 
 	switch n {
@@ -40,7 +42,7 @@ func RandomAlreadyCheckedInMessage() string {
 	}
 }
 
-func RandomCheckinUnavailibleMessage() string {
+func CheckinUnavailibleMessage() string {
 	n := rand.Intn(5)
 
 	switch n {
@@ -54,5 +56,35 @@ func RandomCheckinUnavailibleMessage() string {
 		return "ceйчас никуда не могу записать"
 	default:
 		return "сначала дождитесь объявления"
+	}
+}
+
+func NoTournamentMessage() string {
+	n := rand.Intn(5)
+
+	switch n {
+	case 0:
+		return "турнира нет пока"
+	case 1:
+		return "турнир ещё не начался"
+	case 2:
+		return "попробуйте позже"
+	case 3:
+		return "ceйчас никуда не могу записать"
+	default:
+		return "дождитесь объявления"
+	}
+}
+
+func SadEmoji() string {
+	n := rand.Intn(4)
+
+	switch n {
+	case 0, 1:
+		return "😢"
+	case 2:
+		return "💔"
+	default:
+		return "😭"
 	}
 }

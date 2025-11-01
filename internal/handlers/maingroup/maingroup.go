@@ -48,25 +48,38 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 
 	ctx := context.Background()
 
-	// check if user is already checked in
-	playerList := b.Tournament.List
+	if !b.Tournament.Metadata.Exists {
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.CheckinUnavailibleMessage())
+	}
 
 	userID := int(update.Message.From.ID)
-	for _, player := range playerList {
+
+	var existingPlayer *types.Player
+	for _, player := range b.Tournament.List {
 		if player.ID == userID {
-			return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.RandomAlreadyCheckedInMessage())
+			existingPlayer = &player
+			break
 		}
 	}
+
 	fullUser, err := db.GetByChatID(update.Message.From.ID)
 	if err != nil {
 		log.Printf("failed to get full user data: %v", err)
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ошибка при получении данных пользователя")
 	}
 
-	// check if tournament is full
+	if existingPlayer != nil {
+		if existingPlayer.State == types.StateCheckedOut {
+			return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "вы уже вышли, теперь придётся подождать")
+		}
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.AlreadyCheckedInMessage())
+	}
+
 	limit := b.Tournament.Metadata.Limit
+	activePlayers := countActivePlayers(b.Tournament.List)
+
 	var state string
-	if limit > 0 && len(playerList) >= limit {
+	if limit > 0 && activePlayers >= limit {
 		state = types.StateQueued
 	} else {
 		state = types.StateInTournament
@@ -80,10 +93,6 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 		State:     state,
 	}
 
-	if !b.Tournament.Metadata.Exists {
-		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.RandomCheckinUnavailibleMessage())
-	}
-
 	b.Tournament.AddPlayer(ctx, newPlayer)
 	log.Printf("user %d (%s) checked in to tournament", userID, fullUser.Username)
 
@@ -94,11 +103,60 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 	if state == types.StateQueued {
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "места закончились, добавили вас в очередь")
 	}
-	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.ApproveEmoji())
 }
 
 func handleCheckOut(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "check out")
+	ctx := context.Background()
+
+	if !b.Tournament.Metadata.Exists {
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.NoTournamentMessage())
+	}
+
+	userID := int(update.Message.From.ID)
+
+	var currentPlayer *types.Player
+	for _, player := range b.Tournament.List {
+		if player.ID == userID {
+			currentPlayer = &player
+			break
+		}
+	}
+
+	if currentPlayer == nil {
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "вы не записаны на турнир")
+	}
+
+	if currentPlayer.State == types.StateCheckedOut {
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "вы уже отписались")
+	}
+
+	wasInTournament := currentPlayer.State == types.StateInTournament
+
+	updatedPlayer := *currentPlayer
+	updatedPlayer.State = types.StateCheckedOut
+	updatedPlayer.CheckedOutTime = time.Now().UTC()
+
+	if err := b.Tournament.EditPlayer(ctx, userID, updatedPlayer); err != nil {
+		log.Printf("failed to check out player: %v", err)
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ошибка при отписке")
+	}
+
+	log.Printf("user %d checked out from tournament", userID)
+
+	if wasInTournament {
+		if err := promoteQueuedPlayer(b, ctx); err != nil {
+			log.Printf("failed to promote queued player: %v", err)
+		}
+	}
+
+	if err := updateAnnouncementMessage(b, update.Message.Chat.ID); err != nil {
+		log.Printf("failed to update announcement message: %v", err)
+	}
+
+	go schedulePlayerCleanup(b, userID, 15*time.Minute)
+
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.SadEmoji())
 }
 
 func handleRegularMessage(b *bot.Bot, update tgbotapi.Update) error {
@@ -113,6 +171,39 @@ func handleAction(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "action in main group")
 }
 
+func countActivePlayers(players []types.Player) int {
+	count := 0
+	for _, player := range players {
+		if player.State == types.StateInTournament || player.State == types.StateQueued {
+			count++
+		}
+	}
+	return count
+}
+
+func schedulePlayerCleanup(b *bot.Bot, playerID int, delay time.Duration) {
+	time.Sleep(delay)
+
+	ctx := context.Background()
+
+	var shouldRemove bool
+	for _, player := range b.Tournament.List {
+		if player.ID == playerID && player.State == types.StateCheckedOut {
+			shouldRemove = true
+			break
+		}
+	}
+
+	if shouldRemove {
+		if err := b.Tournament.RemovePlayer(ctx, playerID); err != nil {
+			log.Printf("failed to cleanup checked-out player %d: %v", playerID, err)
+			return
+		}
+
+		log.Printf("cleaned up checked-out player %d after %v", playerID, delay)
+	}
+}
+
 func updateAnnouncementMessage(b *bot.Bot, chatID int64) error {
 	announcementMessageID := b.Tournament.Metadata.AnnouncementMessageID
 	if announcementMessageID == 0 {
@@ -122,6 +213,31 @@ func updateAnnouncementMessage(b *bot.Bot, chatID int64) error {
 	message := buildTournamentListMessage(b)
 
 	return b.EditMessage(chatID, announcementMessageID, message)
+}
+
+func promoteQueuedPlayer(b *bot.Bot, ctx context.Context) error {
+	var firstQueuedPlayer *types.Player
+
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateQueued {
+			firstQueuedPlayer = &player
+			break
+		}
+	}
+
+	if firstQueuedPlayer == nil {
+		return nil
+	}
+
+	updatedPlayer := *firstQueuedPlayer
+	updatedPlayer.State = types.StateInTournament
+
+	if err := b.Tournament.EditPlayer(ctx, firstQueuedPlayer.ID, updatedPlayer); err != nil {
+		return fmt.Errorf("failed to promote player: %w", err)
+	}
+
+	log.Printf("promoted player %d (%s) from queue to tournament", firstQueuedPlayer.ID, firstQueuedPlayer.Username)
+	return nil
 }
 
 func buildTournamentListMessage(b *bot.Bot) string {

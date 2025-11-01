@@ -5,16 +5,18 @@ import (
 )
 
 type Player struct {
-	ID        int       `json:"id"`
-	Username  string    `json:"username"`
-	SavedName string    `json:"saved_name"`
-	TimeAdded time.Time `json:"time_added"`
-	State     string    `json:"state"`
+	ID             int       `json:"id"`
+	Username       string    `json:"username"`
+	SavedName      string    `json:"saved_name"`
+	TimeAdded      time.Time `json:"time_added"`
+	State          string    `json:"state"`
+	CheckedOutTime time.Time `json:"checked_out_time,omitempty"`
 }
 
 const (
 	StateInTournament = "in_tournament"
 	StateQueued       = "queued"
+	StateCheckedOut   = "checked_out"
 )
 
 type TournamentMetadata struct {
