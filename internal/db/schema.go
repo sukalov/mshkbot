@@ -9,7 +9,7 @@ import (
 
 // User represents a telegram user
 type User struct {
-	ChatID        int64      `gorm:"primaryKey;autoIncrement:false;column:chat_id"`
+	ChatID        int64      `gorm:"primaryKey;column:chat_id"`
 	Username      string     `gorm:"column:username;index"`
 	TgName        string     `gorm:"column:tg_name"`
 	SavedName     string     `gorm:"column:saved_name"`

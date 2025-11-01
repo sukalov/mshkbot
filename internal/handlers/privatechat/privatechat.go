@@ -85,12 +85,7 @@ func handleRegister(b *bot.Bot, update tgbotapi.Update) error {
 
 	switch option {
 	case "lichess":
-		editMsg := tgbotapi.NewEditMessageText(
-			chatID,
-			update.CallbackQuery.Message.MessageID,
-			"введите ваш никнейм на lichess:",
-		)
-		if _, err := b.Request(editMsg); err != nil {
+		if err := b.EditMessage(chatID, update.CallbackQuery.Message.MessageID, "введите ваш никнейм на lichess:"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		if err := db.UpdateState(chatID, db.StateAskedLichess); err != nil {
@@ -98,12 +93,7 @@ func handleRegister(b *bot.Bot, update tgbotapi.Update) error {
 		}
 
 	case "chess.com":
-		editMsg := tgbotapi.NewEditMessageText(
-			chatID,
-			update.CallbackQuery.Message.MessageID,
-			"введите ваш никнейм на chess.com:",
-		)
-		if _, err := b.Request(editMsg); err != nil {
+		if err := b.EditMessage(chatID, update.CallbackQuery.Message.MessageID, "введите ваш никнейм на chess.com:"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		if err := db.UpdateState(chatID, db.StateAskedChessCom); err != nil {
@@ -111,12 +101,7 @@ func handleRegister(b *bot.Bot, update tgbotapi.Update) error {
 		}
 
 	case "none":
-		editMsg := tgbotapi.NewEditMessageText(
-			chatID,
-			update.CallbackQuery.Message.MessageID,
-			"введите ваш никнейм для турниров:",
-		)
-		if _, err := b.Request(editMsg); err != nil {
+		if err := b.EditMessage(chatID, update.CallbackQuery.Message.MessageID, "введите ваш никнейм для турниров:"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil {

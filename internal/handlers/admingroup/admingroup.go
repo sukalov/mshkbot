@@ -199,12 +199,19 @@ func handleSuspendDuration(b *bot.Bot, update tgbotapi.Update) error {
 
 	if duration == "cancel" {
 		b.ClearSuspensionProcess(adminChatID)
-		return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "отменено")
+		if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "отменено"); err != nil {
+			return fmt.Errorf("failed to edit message: %w", err)
+		}
+		return nil
 	}
 
 	b.SetSuspensionProcess(adminChatID, duration)
 
-	return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "введите telegram username пользователя:")
+	if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "введите telegram username пользователя:"); err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	return nil
 }
 
 func handleBanPlayer(b *bot.Bot, update tgbotapi.Update) error {
@@ -241,10 +248,17 @@ func handleBanDuration(b *bot.Bot, update tgbotapi.Update) error {
 
 	if duration == "cancel" {
 		b.ClearBanProcess(adminChatID)
-		return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "отменено")
+		if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "отменено"); err != nil {
+			return fmt.Errorf("failed to edit message: %w", err)
+		}
+		return nil
 	}
 
 	b.SetBanProcess(adminChatID, duration)
 
-	return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "введите telegram username пользователя:")
+	if err := b.EditMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Message.MessageID, "введите telegram username пользователя:"); err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	return nil
 }
