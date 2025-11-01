@@ -10,6 +10,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/mshkbot/internal/bot"
 	"github.com/sukalov/mshkbot/internal/db"
+	"github.com/sukalov/mshkbot/internal/types"
 	"github.com/sukalov/mshkbot/internal/utils"
 )
 
@@ -19,6 +20,7 @@ func GetHandlers() bot.HandlerSet {
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
 			"help":               handleHelp,
 			"tournament":         handleTournament,
+			"tournament_json":    handleTournamentJSON,
 			"create_tournament":  handleCreateTournament,
 			"remove_tournament":  handleRemoveTournament,
 			"suspend_from_green": handleSuspendFromGreen,
@@ -40,12 +42,77 @@ func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир\n\n/suspend_from_green - отстранить пользователя от зелёных турниров\n\n/admit_to_green - допустить пользователя к зелёным турнирам\n\n/ban_player - забанить пользователя\n\n/unban_player - разбанить пользователя")
 }
 
-func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
+func handleTournamentJSON(b *bot.Bot, update tgbotapi.Update) error {
 	jsonStr, err := b.Tournament.GetTournamentJSON()
 	if err != nil {
 		return err
 	}
 	return b.SendMessageWithMarkdown(update.Message.Chat.ID, fmt.Sprintf("```json\n%s```", jsonStr), true)
+}
+
+func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
+	if !b.Tournament.Metadata.Exists {
+		return b.SendMessage(update.Message.Chat.ID, "турнир не создан")
+	}
+
+	message := buildTournamentMessageForAdmin(b)
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, message, true)
+}
+
+func buildTournamentMessageForAdmin(b *bot.Bot) string {
+	message := "участники:\n"
+
+	count := 1
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateInTournament {
+			playerLine := fmt.Sprintf("%d. [%s](tg://user?id=%d)", count, player.SavedName, player.ID)
+			if player.PeakRating != nil {
+				var siteURL string
+				switch player.PeakRating.Site {
+				case types.SiteLichess:
+					siteURL = fmt.Sprintf("https://lichess.org/@/%s", player.PeakRating.SiteUsername)
+					playerLine += fmt.Sprintf(" ([%s](%s) %d)", player.PeakRating.Site, siteURL, player.PeakRating.BlitzPeak)
+				case types.SiteChesscom:
+					siteURL = fmt.Sprintf("https://www.chess.com/member/%s", player.PeakRating.SiteUsername)
+					playerLine += fmt.Sprintf(" ([%s](%s) %d)", player.PeakRating.Site, siteURL, player.PeakRating.BlitzPeak)
+				}
+			}
+			message += playerLine + "\n"
+			count++
+		}
+	}
+
+	if count == 1 {
+		message += "пока никого нет\n"
+	}
+
+	queuedPlayers := []types.Player{}
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateQueued {
+			queuedPlayers = append(queuedPlayers, player)
+		}
+	}
+
+	if len(queuedPlayers) > 0 {
+		message += "\nочередь:\n"
+		for i, player := range queuedPlayers {
+			playerLine := fmt.Sprintf("%d. [%s](tg://user?id=%d)", i+1, player.SavedName, player.ID)
+			if player.PeakRating != nil {
+				var siteURL string
+				switch player.PeakRating.Site {
+				case types.SiteLichess:
+					siteURL = fmt.Sprintf("https://lichess.org/@/%s", player.PeakRating.SiteUsername)
+					playerLine += fmt.Sprintf(" ([%s](%s) %d)", player.PeakRating.Site, siteURL, player.PeakRating.BlitzPeak)
+				case types.SiteChesscom:
+					siteURL = fmt.Sprintf("https://www.chess.com/member/%s", player.PeakRating.SiteUsername)
+					playerLine += fmt.Sprintf(" ([%s](%s) %d)", player.PeakRating.Site, siteURL, player.PeakRating.BlitzPeak)
+				}
+			}
+			message += playerLine + "\n"
+		}
+	}
+
+	return message
 }
 
 func handleCreateTournament(b *bot.Bot, update tgbotapi.Update) error {

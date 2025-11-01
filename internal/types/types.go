@@ -4,13 +4,20 @@ import (
 	"time"
 )
 
+type PeakRating struct {
+	Site         string `json:"site"`
+	BlitzPeak    int    `json:"blitz_peak"`
+	SiteUsername string `json:"site_username"`
+}
+
 type Player struct {
-	ID             int       `json:"id"`
-	Username       string    `json:"username"`
-	SavedName      string    `json:"saved_name"`
-	TimeAdded      time.Time `json:"time_added"`
-	State          string    `json:"state"`
-	CheckedOutTime time.Time `json:"checked_out_time,omitempty"`
+	ID             int         `json:"id"`
+	Username       string      `json:"username"`
+	SavedName      string      `json:"saved_name"`
+	TimeAdded      time.Time   `json:"time_added"`
+	State          string      `json:"state"`
+	CheckedOutTime time.Time   `json:"checked_out_time,omitempty"`
+	PeakRating     *PeakRating `json:"peak_rating,omitempty"`
 }
 
 const (
@@ -18,6 +25,9 @@ const (
 	StateQueued       = "queued"
 	StateCheckedOut   = "checked_out"
 )
+
+const SiteLichess = "lichess"
+const SiteChesscom = "chesscom"
 
 type TournamentMetadata struct {
 	Limit                 int  `json:"limit"`

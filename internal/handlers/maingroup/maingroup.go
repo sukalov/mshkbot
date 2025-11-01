@@ -75,30 +75,46 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.AlreadyCheckedInMessage())
 	}
 
-	lichessRatingLimit := b.Tournament.Metadata.LichessRatingLimit
-	if lichessRatingLimit != 0 && fullUser.Lichess != nil {
+	var peakRating *types.PeakRating
+
+	if fullUser.Lichess != nil {
 		lichessPeakRatings, err := utils.GetLichessAllTimeHigh(*fullUser.Lichess)
 		if err != nil {
 			log.Printf("failed to get lichess peak ratings for user %d: %v", userID, err)
 		} else {
-			if lichessPeakRatings.Blitz >= lichessRatingLimit ||
-				lichessPeakRatings.Rapid >= lichessRatingLimit ||
-				lichessPeakRatings.Classical >= lichessRatingLimit {
-				return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на личесе превышает лимит турнира")
+			lichessRatingLimit := b.Tournament.Metadata.LichessRatingLimit
+			if lichessRatingLimit != 0 {
+				if lichessPeakRatings.Blitz >= lichessRatingLimit ||
+					lichessPeakRatings.Rapid >= lichessRatingLimit ||
+					lichessPeakRatings.Classical >= lichessRatingLimit {
+					return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на личесе превышает лимит турнира")
+				}
+			}
+			peakRating = &types.PeakRating{
+				Site:         types.SiteLichess,
+				BlitzPeak:    lichessPeakRatings.Blitz,
+				SiteUsername: *fullUser.Lichess,
 			}
 		}
 	}
 
-	chesscomRatingLimit := b.Tournament.Metadata.ChesscomRatingLimit
-	if chesscomRatingLimit != 0 && fullUser.ChessCom != nil {
+	if fullUser.ChessCom != nil {
 		chesscomPeakRatings, err := utils.GetChessComAllTimeHigh(*fullUser.ChessCom)
 		if err != nil {
 			log.Printf("failed to get chesscom peak ratings for user %d: %v", userID, err)
 		} else {
-			if chesscomPeakRatings.Blitz >= chesscomRatingLimit ||
-				chesscomPeakRatings.Rapid >= chesscomRatingLimit ||
-				chesscomPeakRatings.Classical >= chesscomRatingLimit {
-				return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на чесскоме превышает лимит турнира")
+			chesscomRatingLimit := b.Tournament.Metadata.ChesscomRatingLimit
+			if chesscomRatingLimit != 0 {
+				if chesscomPeakRatings.Blitz >= chesscomRatingLimit ||
+					chesscomPeakRatings.Rapid >= chesscomRatingLimit ||
+					chesscomPeakRatings.Classical >= chesscomRatingLimit {
+					return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на чесскоме превышает лимит турнира")
+				}
+			}
+			peakRating = &types.PeakRating{
+				Site:         types.SiteChesscom,
+				BlitzPeak:    chesscomPeakRatings.Blitz,
+				SiteUsername: *fullUser.ChessCom,
 			}
 		}
 	}
@@ -114,11 +130,12 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	newPlayer := types.Player{
-		ID:        userID,
-		Username:  fullUser.Username,
-		SavedName: fullUser.SavedName,
-		TimeAdded: time.Now().UTC(),
-		State:     state,
+		ID:         userID,
+		Username:   fullUser.Username,
+		SavedName:  fullUser.SavedName,
+		TimeAdded:  time.Now().UTC(),
+		State:      state,
+		PeakRating: peakRating,
 	}
 
 	b.Tournament.AddPlayer(ctx, newPlayer)

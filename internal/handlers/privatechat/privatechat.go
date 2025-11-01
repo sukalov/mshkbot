@@ -101,7 +101,7 @@ func handleRegister(b *bot.Bot, update tgbotapi.Update) error {
 		}
 
 	case "none":
-		if err := b.EditMessage(chatID, update.CallbackQuery.Message.MessageID, "введите ваш никнейм для турниров:"); err != nil {
+		if err := b.EditMessage(chatID, update.CallbackQuery.Message.MessageID, "введите ваш псевдоним для турниров:"); err != nil {
 			return fmt.Errorf("failed to edit message: %w", err)
 		}
 		if err := db.UpdateState(chatID, db.StateAskedSavedName); err != nil {

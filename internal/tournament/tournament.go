@@ -179,23 +179,6 @@ func (tm *TournamentManager) Sync(ctx context.Context) error {
 	return nil
 }
 
-func (tm *TournamentManager) RemoveState(ctx context.Context, stateID int) error {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
-	result := []types.Player{}
-	for _, state := range tm.List {
-		if state.ID != stateID {
-			result = append(result, state)
-		}
-	}
-	tm.List = result
-	if err := redis.SetList(ctx, result); err != nil {
-		fmt.Printf("error happened while updating the redis list: %s", err)
-		return err
-	}
-	return nil
-}
-
 func (tm *TournamentManager) GetTournamentJSON() (string, error) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
