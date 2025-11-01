@@ -11,10 +11,9 @@ import (
 )
 
 type TournamentManager struct {
-	mu     sync.RWMutex
-	List   []types.Player
-	Limit  int
-	Exists bool
+	mu       sync.RWMutex
+	List     []types.Player
+	Metadata types.TournamentMetadata
 }
 
 type ByTimeAdded []types.Player
@@ -28,23 +27,17 @@ func (tm *TournamentManager) Init() error {
 	fmt.Println("initializing tournament")
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	// Retrieve the list from Redis
 	list, err := redis.GetList(ctx)
-	limit, err2 := redis.GetLimit(ctx)
-	exists, err3 := redis.GetExists(ctx)
 	if err != nil {
 		return err
 	}
-	if err2 != nil {
-		return err2
-	}
-	if err3 != nil {
-		return err3
+	metadata, err := redis.GetMetadata(ctx)
+	if err != nil {
+		return err
 	}
 	tm.List = list
-	tm.Limit = limit
-	tm.Exists = exists
-	if !tm.Exists && len(tm.List) > 0 {
+	tm.Metadata = metadata
+	if !tm.Metadata.Exists && len(tm.List) > 0 {
 		fmt.Println("tournament does not exist but list is not empty, clearing list")
 		if err := tm.removeTournament(ctx); err != nil {
 			return err
@@ -65,17 +58,20 @@ func (tm *TournamentManager) AddPlayer(ctx context.Context, player types.Player)
 	return nil
 }
 
-func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, ratingLimit int) error {
+func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, ratingLimit int, announcementMessageID int) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	tm.Exists = true
-	tm.List = []types.Player{}
-	if err := redis.SetExists(ctx, true); err != nil {
-		fmt.Printf("error happened while saving list state to redis: %s", err)
-		return err
+	if tm.Metadata.Exists {
+		return fmt.Errorf("tournament already exists")
 	}
-	if err := redis.SetList(ctx, tm.List); err != nil {
-		fmt.Printf("error happened while saving list state to redis: %s", err)
+	tm.Metadata = types.TournamentMetadata{
+		Limit:                 limit,
+		RatingLimit:           ratingLimit,
+		AnnouncementMessageID: announcementMessageID,
+		Exists:                true,
+	}
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while saving metadata to redis: %s", err)
 		return err
 	}
 	return nil
@@ -84,26 +80,39 @@ func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, ra
 func (tm *TournamentManager) RemoveTournament(ctx context.Context) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	tm.Exists = false
+	if !tm.Metadata.Exists {
+		return fmt.Errorf("tournament does not exist")
+	}
+	tm.Metadata = types.TournamentMetadata{
+		Limit:                 0,
+		RatingLimit:           0,
+		AnnouncementMessageID: 0,
+		Exists:                false,
+	}
 	if err := tm.clearList(ctx); err != nil {
 		fmt.Printf("error happened while clearing the redis list: %s", err)
 		return err
 	}
-	if err := redis.SetExists(ctx, false); err != nil {
-		fmt.Printf("error happened while saving list state to redis: %s", err)
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while saving metadata to redis: %s", err)
 		return err
 	}
 	return nil
 }
 
 func (tm *TournamentManager) removeTournament(ctx context.Context) error {
-	tm.Exists = false
+	tm.Metadata = types.TournamentMetadata{
+		Limit:                 0,
+		RatingLimit:           0,
+		AnnouncementMessageID: 0,
+		Exists:                false,
+	}
 	if err := tm.clearList(ctx); err != nil {
 		fmt.Printf("error happened while clearing the redis list: %s", err)
 		return err
 	}
-	if err := redis.SetExists(ctx, false); err != nil {
-		fmt.Printf("error happened while saving list state to redis: %s", err)
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while saving metadata to redis: %s", err)
 		return err
 	}
 	return nil
@@ -111,7 +120,6 @@ func (tm *TournamentManager) removeTournament(ctx context.Context) error {
 
 func (tm *TournamentManager) clearList(ctx context.Context) error {
 	tm.List = []types.Player{}
-	fmt.Printf("clearing list KUYFIUFUT: %v", tm.List)
 	if err := redis.SetList(ctx, tm.List); err != nil {
 		fmt.Printf("error happened while clearing the redis list: %s", err)
 	}
@@ -161,12 +169,8 @@ func (tm *TournamentManager) Sync(ctx context.Context) error {
 		fmt.Printf("error happened while updating the redis list: %s", err)
 		return err
 	}
-	if err := redis.SetExists(ctx, tm.Exists); err != nil {
-		fmt.Printf("error happened while updating the redis exists: %s", err)
-		return err
-	}
-	if err := redis.SetLimit(ctx, tm.Limit); err != nil {
-		fmt.Printf("error happened while updating the redis limit: %s", err)
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while updating the redis metadata: %s", err)
 		return err
 	}
 	return nil
@@ -188,18 +192,17 @@ func (tm *TournamentManager) RemoveState(ctx context.Context, stateID int) error
 	}
 	return nil
 }
+
 func (tm *TournamentManager) GetTournamentJSON() (string, error) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
 	data := struct {
-		List   []types.Player `json:"players"`
-		Limit  int            `json:"limit"`
-		Exists bool           `json:"exists"`
+		List     []types.Player           `json:"players"`
+		Metadata types.TournamentMetadata `json:"metadata"`
 	}{
-		List:   tm.List,
-		Limit:  tm.Limit,
-		Exists: tm.Exists,
+		List:     tm.List,
+		Metadata: tm.Metadata,
 	}
 
 	jsonData, err := json.MarshalIndent(data, "", "  ")
@@ -213,9 +216,31 @@ func (tm *TournamentManager) GetTournamentJSON() (string, error) {
 func (tm *TournamentManager) SetLimit(ctx context.Context, limit int) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	tm.Limit = limit
-	if err := redis.SetLimit(ctx, limit); err != nil {
-		fmt.Printf("error happened while updating the redis limit: %s", err)
+	tm.Metadata.Limit = limit
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while updating the redis metadata: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (tm *TournamentManager) SetRatingLimit(ctx context.Context, ratingLimit int) error {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.Metadata.RatingLimit = ratingLimit
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while updating the redis metadata: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (tm *TournamentManager) SetAnnouncementMessageID(ctx context.Context, messageID int) error {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.Metadata.AnnouncementMessageID = messageID
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while updating the redis metadata: %s", err)
 		return err
 	}
 	return nil

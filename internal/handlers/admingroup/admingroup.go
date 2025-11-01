@@ -17,6 +17,7 @@ func GetHandlers() bot.HandlerSet {
 			"help":              handleHelp,
 			"tournament":        handleTournament,
 			"create_tournament": handleCreateTournament,
+			"remove_tournament": handleRemoveTournament,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handleAdminMessage,
@@ -26,7 +27,7 @@ func GetHandlers() bot.HandlerSet {
 }
 
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир")
+	return b.SendMessage(update.Message.Chat.ID, "команды администратора:\n\n/tournament - показать состояние турнира\n\n/create_tournament - сделать турнир\n\n/remove_tournament - удалить турнир")
 }
 
 func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
@@ -39,10 +40,27 @@ func handleTournament(b *bot.Bot, update tgbotapi.Update) error {
 
 func handleCreateTournament(b *bot.Bot, update tgbotapi.Update) error {
 	ctx := context.Background()
-	if b.Tournament.Exists {
+	if b.Tournament.Metadata.Exists {
 		return b.SendMessage(update.Message.Chat.ID, "турнир уже создан")
 	}
-	if err := b.Tournament.CreateTournament(ctx, 26, 0); err != nil {
+	if err := b.Tournament.CreateTournament(ctx, 26, 0, 0); err != nil {
+		return err
+	}
+	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())
+}
+
+func handleRemoveTournament(b *bot.Bot, update tgbotapi.Update) error {
+	ctx := context.Background()
+	if !b.Tournament.Metadata.Exists {
+		return b.SendMessage(update.Message.Chat.ID, "его и так нет")
+	}
+	announcementMessageID := b.Tournament.Metadata.AnnouncementMessageID
+	if announcementMessageID != 0 {
+		if err := b.UnpinMessage(b.GetMainGroupID(), announcementMessageID); err != nil {
+			log.Printf("failed to unpin message: %v", err)
+		}
+	}
+	if err := b.Tournament.RemoveTournament(ctx); err != nil {
 		return err
 	}
 	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.RandomApproveEmoji())

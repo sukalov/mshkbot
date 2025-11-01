@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -37,9 +38,9 @@ func New(bot *bot.Bot, mainGroupID int64) *Scheduler {
 func (s *Scheduler) Start() {
 	log.Println("starting cron scheduler")
 
-	s.scheduleWeekly(time.Monday, 12, 0, s.mondayTask)
-	s.scheduleWeekly(time.Wednesday, 12, 30, s.wednesdayTask)
-	s.scheduleWeekly(time.Friday, 16, 15, s.randomTask)
+	// s.scheduleWeekly(time.Monday, 12, 0, s.mondayTask)
+	// s.scheduleWeekly(time.Wednesday, 12, 30, s.wednesdayTask)
+	s.scheduleWeekly(time.Saturday, 16, 59, s.testingTournamentStart)
 }
 
 func (s *Scheduler) Stop() {
@@ -103,26 +104,41 @@ func (s *Scheduler) timeUntilNext(task scheduledTask) time.Duration {
 
 // task handlers below
 
-func (s *Scheduler) mondayTask() {
-	message := "сегодня понедельник"
+// func (s *Scheduler) mondayTask() {
+// 	message := "сегодня понедельник"
 
-	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
-		log.Printf("failed to send monday message: %v", err)
+// 	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
+// 		log.Printf("failed to send monday message: %v", err)
+// 	}
+// }
+
+// func (s *Scheduler) wednesdayTask() {
+// 	message := "сегодня среда"
+
+// 	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
+// 		log.Printf("failed to send wednesday message: %v", err)
+// 	}
+// }
+
+func (s *Scheduler) testingTournamentStart() {
+	ctx := context.Background()
+	if err := s.bot.Tournament.CreateTournament(ctx, 26, 0, 0); err != nil {
+		log.Printf("failed to create tournament: %v", err)
+		return
 	}
-}
+	announcementMessage := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\nпока никого нет"
 
-func (s *Scheduler) wednesdayTask() {
-	message := "сегодня среда"
-
-	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
-		log.Printf("failed to send wednesday message: %v", err)
+	messageID, err := s.bot.SendMessageAndGetID(s.mainGroupID, announcementMessage)
+	if err != nil {
+		log.Printf("failed to send message: %v", err)
+		return
 	}
-}
 
-func (s *Scheduler) randomTask() {
-	message := "ТУРНИР НАЧАЛСЯ!!!"
+	if err := s.bot.Tournament.SetAnnouncementMessageID(ctx, messageID); err != nil {
+		log.Printf("failed to store announcement message ID: %v", err)
+	}
 
-	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
-		log.Printf("failed to send monday message: %v", err)
+	if err := s.bot.PinMessage(s.mainGroupID, messageID); err != nil {
+		log.Printf("failed to pin message: %v", err)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -19,7 +18,6 @@ type TopRatings struct {
 }
 
 func LoadEnv(requiredVars []string) (map[string]string, error) {
-	// Load the .env file
 	if err := godotenv.Load(); err != nil {
 		return nil, fmt.Errorf("error loading .env file: %w", err)
 	}
@@ -143,40 +141,4 @@ func GetChessComAllTimeHigh(username string) (TopRatings, error) {
 	}
 
 	return topRatings, nil
-}
-
-func RandomApproveEmoji() string {
-	n := rand.Intn(100)
-
-	if n < 3 {
-		return "🎉"
-	}
-
-	remaining := (n - 3) % 4
-
-	switch remaining {
-	case 0:
-		return "👍"
-	case 1:
-		return "👌"
-	case 2:
-		return "🫡"
-	default:
-		return "🤝"
-	}
-}
-
-func RandomAlreadyCheckedInMessage() string {
-	n := rand.Intn(4)
-
-	switch n {
-	case 0:
-		return "вы уже записаны на турнир"
-	case 1:
-		return "хватит тыкать, вы уже записаны"
-	case 2:
-		return "второй раз записаться нельзя"
-	default:
-		return "достаточно записаться один раз"
-	}
 }

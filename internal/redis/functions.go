@@ -13,11 +13,11 @@ func SetList(ctx context.Context, list []types.Player) error {
 	if err != nil {
 		return err
 	}
-	return Client.Set(ctx, "tournament", listJSON, 0).Err()
+	return Client.Set(ctx, "tournament_list", listJSON, 0).Err()
 }
 
 func GetList(ctx context.Context) ([]types.Player, error) {
-	data, err := Client.Get(ctx, "tournament").Bytes()
+	data, err := Client.Get(ctx, "tournament_list").Bytes()
 	if err != nil {
 		if err == redisClient.Nil {
 			return []types.Player{}, nil
@@ -31,48 +31,25 @@ func GetList(ctx context.Context) ([]types.Player, error) {
 	return list, nil
 }
 
-func GetLimit(ctx context.Context) (int, error) {
-	data, err := Client.Get(ctx, "tournament_limit").Bytes()
-	if err != nil {
-		if err == redisClient.Nil {
-			return 0, nil
-		}
-		return 0, err
-	}
-	var limit int
-	if err := json.Unmarshal(data, &limit); err != nil {
-		return 0, err
-	}
-	return limit, nil
-}
-
-func SetLimit(ctx context.Context, limit int) error {
-	limitJSON, err := json.Marshal(limit)
+func SetMetadata(ctx context.Context, metadata types.TournamentMetadata) error {
+	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		return err
 	}
-	return Client.Set(ctx, "tournament_limit", limitJSON, 0).Err()
+	return Client.Set(ctx, "tournament_metadata", metadataJSON, 0).Err()
 }
 
-func GetExists(ctx context.Context) (bool, error) {
-	data, err := Client.Get(ctx, "tournament_exists").Bytes()
+func GetMetadata(ctx context.Context) (types.TournamentMetadata, error) {
+	data, err := Client.Get(ctx, "tournament_metadata").Bytes()
 	if err != nil {
 		if err == redisClient.Nil {
-			return false, nil
+			return types.TournamentMetadata{}, nil
 		}
-		return false, err
+		return types.TournamentMetadata{}, err
 	}
-	var exists bool
-	if err := json.Unmarshal(data, &exists); err != nil {
-		return false, err
+	var metadata types.TournamentMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return types.TournamentMetadata{}, err
 	}
-	return exists, nil
-}
-
-func SetExists(ctx context.Context, exists bool) error {
-	existsJSON, err := json.Marshal(exists)
-	if err != nil {
-		return err
-	}
-	return Client.Set(ctx, "tournament_exists", existsJSON, 0).Err()
+	return metadata, nil
 }

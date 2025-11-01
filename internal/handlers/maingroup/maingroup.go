@@ -64,7 +64,7 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	// check if tournament is full
-	limit := b.Tournament.Limit
+	limit := b.Tournament.Metadata.Limit
 	var state string
 	if limit > 0 && len(playerList) >= limit {
 		state = types.StateQueued
@@ -75,16 +75,22 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 	newPlayer := types.Player{
 		ID:        userID,
 		Username:  fullUser.Username,
+		SavedName: fullUser.SavedName,
 		TimeAdded: time.Now().UTC(),
 		State:     state,
 	}
 
-	if !b.Tournament.Exists {
-		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "сейчас никуда не могу записать")
+	if !b.Tournament.Metadata.Exists {
+		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.RandomCheckinUnavailibleMessage())
 	}
 
 	b.Tournament.AddPlayer(ctx, newPlayer)
 	log.Printf("user %d (%s) checked in to tournament", userID, fullUser.Username)
+
+	if err := updateAnnouncementMessage(b, update.Message.Chat.ID); err != nil {
+		log.Printf("failed to update announcement message: %v", err)
+	}
+
 	if state == types.StateQueued {
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "места закончились, добавили вас в очередь")
 	}
@@ -105,4 +111,47 @@ func handleRegularMessage(b *bot.Bot, update tgbotapi.Update) error {
 
 func handleAction(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "action in main group")
+}
+
+func updateAnnouncementMessage(b *bot.Bot, chatID int64) error {
+	announcementMessageID := b.Tournament.Metadata.AnnouncementMessageID
+	if announcementMessageID == 0 {
+		return nil
+	}
+
+	message := buildTournamentListMessage(b)
+
+	return b.EditMessage(chatID, announcementMessageID, message)
+}
+
+func buildTournamentListMessage(b *bot.Bot) string {
+	message := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\n"
+
+	count := 1
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateInTournament {
+			message += fmt.Sprintf("%d. %s\n", count, player.SavedName)
+			count++
+		}
+	}
+
+	if count == 1 {
+		message += "пока никого нет\n"
+	}
+
+	queuedPlayers := []types.Player{}
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateQueued {
+			queuedPlayers = append(queuedPlayers, player)
+		}
+	}
+
+	if len(queuedPlayers) > 0 {
+		message += "\nочередь:\n"
+		for i, player := range queuedPlayers {
+			message += fmt.Sprintf("%d. %s\n", i+1, player.Username)
+		}
+	}
+
+	return message
 }

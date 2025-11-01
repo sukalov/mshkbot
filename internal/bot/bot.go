@@ -92,7 +92,10 @@ func (b *Bot) Start(
 	}
 }
 
-// refreshAdminList fetches current admin list from admin group
+func (b *Bot) GetMainGroupID() int64 {
+	return b.mainGroupID
+}
+
 func (b *Bot) refreshAdminList() {
 	config := tgbotapi.ChatAdministratorsConfig{
 		ChatConfig: tgbotapi.ChatConfig{
@@ -232,6 +235,16 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 	return err
 }
 
+func (b *Bot) SendMessageAndGetID(chatID int64, text string) (int, error) {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.DisableWebPagePreview = true
+	sentMsg, err := b.Client.Send(msg)
+	if err != nil {
+		return 0, err
+	}
+	return sentMsg.MessageID, nil
+}
+
 func (b *Bot) SendMessageWithMarkdown(chatID int64, text string, disableLinks bool) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
@@ -334,6 +347,91 @@ func (b *Bot) ReplyToMessage(chatID int64, messageID int, text string) error {
 		"reply_parameters": map[string]interface{}{
 			"message_id": messageID,
 		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
+}
+
+func (b *Bot) PinMessage(chatID int64, messageID int) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/pinChatMessage", b.Client.Token)
+
+	reqBody := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
+}
+
+func (b *Bot) EditMessage(chatID int64, messageID int, text string) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/editMessageText", b.Client.Token)
+
+	reqBody := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
+		"text":       text,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("telegram api error: %v", result)
+	}
+
+	return nil
+}
+
+func (b *Bot) UnpinMessage(chatID int64, messageID int) error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/unpinChatMessage", b.Client.Token)
+
+	reqBody := map[string]interface{}{
+		"chat_id":    chatID,
+		"message_id": messageID,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
