@@ -21,7 +21,8 @@ const (
 
 type TournamentMetadata struct {
 	Limit                 int  `json:"limit"`
-	RatingLimit           int  `json:"rating_limit"`
+	LichessRatingLimit    int  `json:"lichess_rating_limit"`
+	ChesscomRatingLimit   int  `json:"chesscom_rating_limit"`
 	AnnouncementMessageID int  `json:"announcement_message_id"`
 	Exists                bool `json:"exists"`
 }

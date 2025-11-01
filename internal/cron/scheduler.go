@@ -40,7 +40,7 @@ func (s *Scheduler) Start() {
 
 	// s.scheduleWeekly(time.Monday, 12, 0, s.mondayTask)
 	// s.scheduleWeekly(time.Wednesday, 12, 30, s.wednesdayTask)
-	s.scheduleWeekly(time.Saturday, 16, 59, s.testingTournamentStart)
+	s.scheduleWeekly(time.Saturday, 20, 05, s.testingTournamentStart)
 }
 
 func (s *Scheduler) Stop() {
@@ -122,7 +122,7 @@ func (s *Scheduler) timeUntilNext(task scheduledTask) time.Duration {
 
 func (s *Scheduler) testingTournamentStart() {
 	ctx := context.Background()
-	if err := s.bot.Tournament.CreateTournament(ctx, 26, 0, 0); err != nil {
+	if err := s.bot.Tournament.CreateTournament(ctx, 26, 0, 0, 0); err != nil {
 		log.Printf("failed to create tournament: %v", err)
 		return
 	}

@@ -75,6 +75,34 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.AlreadyCheckedInMessage())
 	}
 
+	lichessRatingLimit := b.Tournament.Metadata.LichessRatingLimit
+	if lichessRatingLimit != 0 && fullUser.Lichess != nil {
+		lichessPeakRatings, err := utils.GetLichessAllTimeHigh(*fullUser.Lichess)
+		if err != nil {
+			log.Printf("failed to get lichess peak ratings for user %d: %v", userID, err)
+		} else {
+			if lichessPeakRatings.Blitz >= lichessRatingLimit ||
+				lichessPeakRatings.Rapid >= lichessRatingLimit ||
+				lichessPeakRatings.Classical >= lichessRatingLimit {
+				return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на личесе превышает лимит турнира")
+			}
+		}
+	}
+
+	chesscomRatingLimit := b.Tournament.Metadata.ChesscomRatingLimit
+	if chesscomRatingLimit != 0 && fullUser.ChessCom != nil {
+		chesscomPeakRatings, err := utils.GetChessComAllTimeHigh(*fullUser.ChessCom)
+		if err != nil {
+			log.Printf("failed to get chesscom peak ratings for user %d: %v", userID, err)
+		} else {
+			if chesscomPeakRatings.Blitz >= chesscomRatingLimit ||
+				chesscomPeakRatings.Rapid >= chesscomRatingLimit ||
+				chesscomPeakRatings.Classical >= chesscomRatingLimit {
+				return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "ваш пиковый рейтинг на чесскоме превышает лимит турнира")
+			}
+		}
+	}
+
 	limit := b.Tournament.Metadata.Limit
 	activePlayers := countActivePlayers(b.Tournament.List)
 
@@ -154,7 +182,7 @@ func handleCheckOut(b *bot.Bot, update tgbotapi.Update) error {
 		log.Printf("failed to update announcement message: %v", err)
 	}
 
-	go schedulePlayerCleanup(b, userID, 15*time.Minute)
+	go schedulePlayerCleanup(b, userID, 0*time.Minute)
 
 	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.SadEmoji())
 }
@@ -265,7 +293,7 @@ func buildTournamentListMessage(b *bot.Bot) string {
 	if len(queuedPlayers) > 0 {
 		message += "\nочередь:\n"
 		for i, player := range queuedPlayers {
-			message += fmt.Sprintf("%d. %s\n", i+1, player.Username)
+			message += fmt.Sprintf("%d. %s &#9816;\n", i+1, player.SavedName)
 		}
 	}
 

@@ -58,7 +58,7 @@ func (tm *TournamentManager) AddPlayer(ctx context.Context, player types.Player)
 	return nil
 }
 
-func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, ratingLimit int, announcementMessageID int) error {
+func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, lichessRatingLimit int, chesscomRatingLimit int, announcementMessageID int) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	if tm.Metadata.Exists {
@@ -66,7 +66,8 @@ func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, ra
 	}
 	tm.Metadata = types.TournamentMetadata{
 		Limit:                 limit,
-		RatingLimit:           ratingLimit,
+		LichessRatingLimit:    lichessRatingLimit,
+		ChesscomRatingLimit:   chesscomRatingLimit,
 		AnnouncementMessageID: announcementMessageID,
 		Exists:                true,
 	}
@@ -85,7 +86,8 @@ func (tm *TournamentManager) RemoveTournament(ctx context.Context) error {
 	}
 	tm.Metadata = types.TournamentMetadata{
 		Limit:                 0,
-		RatingLimit:           0,
+		LichessRatingLimit:    0,
+		ChesscomRatingLimit:   0,
 		AnnouncementMessageID: 0,
 		Exists:                false,
 	}
@@ -103,7 +105,8 @@ func (tm *TournamentManager) RemoveTournament(ctx context.Context) error {
 func (tm *TournamentManager) removeTournament(ctx context.Context) error {
 	tm.Metadata = types.TournamentMetadata{
 		Limit:                 0,
-		RatingLimit:           0,
+		LichessRatingLimit:    0,
+		ChesscomRatingLimit:   0,
 		AnnouncementMessageID: 0,
 		Exists:                false,
 	}
@@ -224,10 +227,21 @@ func (tm *TournamentManager) SetLimit(ctx context.Context, limit int) error {
 	return nil
 }
 
-func (tm *TournamentManager) SetRatingLimit(ctx context.Context, ratingLimit int) error {
+func (tm *TournamentManager) SetLichessRatingLimit(ctx context.Context, ratingLimit int) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	tm.Metadata.RatingLimit = ratingLimit
+	tm.Metadata.LichessRatingLimit = ratingLimit
+	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
+		fmt.Printf("error happened while updating the redis metadata: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (tm *TournamentManager) SetChesscomRatingLimit(ctx context.Context, ratingLimit int) error {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.Metadata.ChesscomRatingLimit = ratingLimit
 	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
 		fmt.Printf("error happened while updating the redis metadata: %s", err)
 		return err

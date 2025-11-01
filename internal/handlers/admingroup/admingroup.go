@@ -43,7 +43,7 @@ func handleCreateTournament(b *bot.Bot, update tgbotapi.Update) error {
 	if b.Tournament.Metadata.Exists {
 		return b.SendMessage(update.Message.Chat.ID, "турнир уже создан")
 	}
-	if err := b.Tournament.CreateTournament(ctx, 26, 0, 0); err != nil {
+	if err := b.Tournament.CreateTournament(ctx, 26, 0, 0, 0); err != nil {
 		return err
 	}
 	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.ApproveEmoji())
