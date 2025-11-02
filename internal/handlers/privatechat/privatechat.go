@@ -1,6 +1,7 @@
 package privatechat
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/mshkbot/internal/bot"
 	"github.com/sukalov/mshkbot/internal/db"
+	"github.com/sukalov/mshkbot/internal/types"
 	"github.com/sukalov/mshkbot/internal/utils"
 )
 
@@ -15,10 +17,11 @@ import (
 func GetHandlers() bot.HandlerSet {
 	return bot.HandlerSet{
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-			"start":     handleStart,
-			"help":      handleHelp,
-			"me":        handleMe,
-			"myratings": handleMyRatings,
+			"start":           handleStart,
+			"help":            handleHelp,
+			"me":              handleMe,
+			"myratings":       handleMyRatings,
+			"change_nickname": handleChangeNickname,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handlePrivateMessage,
@@ -116,7 +119,7 @@ func handleRegister(b *bot.Bot, update tgbotapi.Update) error {
 }
 
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "help")
+	return b.SendMessage(update.Message.Chat.ID, "/help — показать это сообщение\n\n/me — показать вашу информацию\n\n/myratings — показать пиковые рейтинги\n\n/change_nickname — изменить никнейм для турниров")
 }
 
 func handleMe(b *bot.Bot, update tgbotapi.Update) error {
@@ -125,7 +128,7 @@ func handleMe(b *bot.Bot, update tgbotapi.Update) error {
 	if user, err := db.GetByChatID(chatID); err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	} else {
-		return b.SendMessage(chatID, db.Stringify(user, false))
+		return b.SendMessageWithMarkdown(chatID, db.Stringify(user), true)
 	}
 }
 
@@ -161,6 +164,25 @@ func handleMyRatings(b *bot.Bot, update tgbotapi.Update) error {
 
 		return b.SendMessage(chatID, fmt.Sprintf("%s\n%s", lichess, chesscom))
 	}
+}
+
+func handleChangeNickname(b *bot.Bot, update tgbotapi.Update) error {
+	chatID := update.Message.Chat.ID
+
+	user, err := db.GetByChatID(chatID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if user.SavedName == "" {
+		return b.SendMessage(chatID, "у вас ещё нет сохранённого никнейма")
+	}
+
+	if err := db.UpdateState(chatID, db.StateEditingSavedName); err != nil {
+		return fmt.Errorf("failed to update state: %w", err)
+	}
+
+	return b.SendMessage(chatID, fmt.Sprintf("ваш текущий никнейм: %s\n\nвведите новый никнейм:", user.SavedName))
 }
 
 func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
@@ -222,7 +244,6 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 		return b.SendMessage(chatID, "введите ваш никнейм для турниров:")
 
 	case db.StateAskedSavedName:
-		// user sent their saved name
 		savedName := strings.TrimSpace(update.Message.Text)
 
 		if err := db.UpdateSavedName(chatID, savedName); err != nil {
@@ -230,16 +251,115 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
 		}
 
-		// registration complete
 		if err := db.UpdateState(chatID, db.StateCompleted); err != nil {
 			return fmt.Errorf("failed to update state: %w", err)
 		}
 
 		return b.SendMessage(chatID, "отлично! регистрация завершена. теперь можете записываться на турниры в чате @moscowchessclub")
 
+	case db.StateEditingSavedName:
+		newName := strings.TrimSpace(update.Message.Text)
+
+		if newName == "" {
+			return b.SendMessage(chatID, "никнейм не может быть пустым")
+		}
+
+		if err := db.UpdateSavedName(chatID, newName); err != nil {
+			log.Printf("failed to update saved name: %v", err)
+			return b.SendMessage(chatID, "произошла ошибка, попробуйте еще раз")
+		}
+
+		if err := db.UpdateState(chatID, db.StateCompleted); err != nil {
+			return fmt.Errorf("failed to update state: %w", err)
+		}
+
+		if err := b.SendMessage(chatID, fmt.Sprintf("никнейм успешно изменён на: %s", newName)); err != nil {
+			return err
+		}
+
+		if err := updateTournamentPlayerName(b, int(chatID), newName); err != nil {
+			log.Printf("failed to update tournament player name: %v", err)
+		}
+
+		return nil
+
 	default:
 		log.Printf("private message from %d: %s", update.Message.From.ID, update.Message.Text)
 	}
 
 	return nil
+}
+
+func updateTournamentPlayerName(b *bot.Bot, playerID int, newName string) error {
+	ctx := context.Background()
+
+	if !b.Tournament.Metadata.Exists {
+		return nil
+	}
+
+	var currentPlayer *types.Player
+	for _, player := range b.Tournament.List {
+		if player.ID == playerID {
+			currentPlayer = &player
+			break
+		}
+	}
+
+	if currentPlayer == nil {
+		return nil
+	}
+
+	updatedPlayer := *currentPlayer
+	updatedPlayer.SavedName = newName
+
+	if err := b.Tournament.EditPlayer(ctx, playerID, updatedPlayer); err != nil {
+		return fmt.Errorf("failed to update player in tournament: %w", err)
+	}
+
+	log.Printf("updated player %d name to %s in tournament", playerID, newName)
+
+	announcementMessageID := b.Tournament.Metadata.AnnouncementMessageID
+	if announcementMessageID == 0 {
+		return nil
+	}
+
+	message := buildTournamentListMessage(b)
+	if err := b.EditMessage(b.GetMainGroupID(), announcementMessageID, message); err != nil {
+		return fmt.Errorf("failed to update announcement message: %w", err)
+	}
+
+	log.Printf("updated announcement message after name change")
+	return nil
+}
+
+func buildTournamentListMessage(b *bot.Bot) string {
+	message := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\n"
+
+	count := 1
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateInTournament {
+			message += fmt.Sprintf("%d. %s\n", count, player.SavedName)
+			count++
+		}
+	}
+
+	if count == 1 {
+		message += "пока никого нет\n"
+	}
+
+	queuedPlayers := []types.Player{}
+	for _, player := range b.Tournament.List {
+		if player.State == types.StateQueued {
+			queuedPlayers = append(queuedPlayers, player)
+		}
+	}
+
+	if len(queuedPlayers) > 0 {
+		message += "\nочередь:\n"
+		for i, player := range queuedPlayers {
+			message += fmt.Sprintf("%d. %s &#9816;\n", i+1, player.SavedName)
+		}
+	}
+
+	return message
 }

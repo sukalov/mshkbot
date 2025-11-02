@@ -257,17 +257,17 @@ func Delete(chatID int64) error {
 	return nil
 }
 
-func Stringify(u User, markdown bool) string {
+func Stringify(u User) string {
 	builder := strings.Builder{}
 
 	if u.SavedName != "" {
 		builder.WriteString(fmt.Sprintf("ник: %s\n", u.SavedName))
 	}
 	if u.Lichess != nil && *u.Lichess != "" {
-		builder.WriteString(fmt.Sprintf("lichess.org/@/%s\n", *u.Lichess))
+		builder.WriteString(fmt.Sprintf("lichess: [%s](https://lichess.org/@/%s)\n", *u.Lichess, *u.Lichess))
 	}
 	if u.ChessCom != nil && *u.ChessCom != "" {
-		builder.WriteString(fmt.Sprintf("chess.com/member/%s\n", *u.ChessCom))
+		builder.WriteString(fmt.Sprintf("chess.com: [%s](https://www.chess.com/member/%s)\n", *u.ChessCom, *u.ChessCom))
 	}
 
 	return builder.String()

@@ -199,7 +199,7 @@ func handleCheckOut(b *bot.Bot, update tgbotapi.Update) error {
 		log.Printf("failed to update announcement message: %v", err)
 	}
 
-	go schedulePlayerCleanup(b, userID, 0*time.Minute)
+	go schedulePlayerCleanup(b, userID, 15*time.Minute)
 
 	return b.GiveReaction(update.Message.Chat.ID, update.Message.MessageID, utils.SadEmoji())
 }
