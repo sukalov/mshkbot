@@ -323,7 +323,12 @@ func updateTournamentPlayerName(b *bot.Bot, playerID int, newName string) error 
 		return nil
 	}
 
-	message := buildTournamentListMessage(b)
+	messageIntro := b.Tournament.Metadata.AnnouncementIntro
+	if messageIntro == "" {
+		messageIntro = "запись на турнир открыта"
+	}
+
+	message := buildTournamentListMessage(b, messageIntro)
 	if err := b.EditMessage(b.GetMainGroupID(), announcementMessageID, message); err != nil {
 		return fmt.Errorf("failed to update announcement message: %w", err)
 	}
@@ -332,8 +337,8 @@ func updateTournamentPlayerName(b *bot.Bot, playerID int, newName string) error 
 	return nil
 }
 
-func buildTournamentListMessage(b *bot.Bot) string {
-	message := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\n"
+func buildTournamentListMessage(b *bot.Bot, messageIntro string) string {
+	message := fmt.Sprintf("%s\n\nучастники:\n", messageIntro)
 
 	count := 1
 	for _, player := range b.Tournament.List {

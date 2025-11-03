@@ -58,18 +58,18 @@ func (tm *TournamentManager) AddPlayer(ctx context.Context, player types.Player)
 	return nil
 }
 
-func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, lichessRatingLimit int, chesscomRatingLimit int, announcementMessageID int) error {
+func (tm *TournamentManager) CreateTournament(ctx context.Context, limit int, lichessRatingLimit int, chesscomRatingLimit int, announcementIntro string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	if tm.Metadata.Exists {
 		return fmt.Errorf("tournament already exists")
 	}
 	tm.Metadata = types.TournamentMetadata{
-		Limit:                 limit,
-		LichessRatingLimit:    lichessRatingLimit,
-		ChesscomRatingLimit:   chesscomRatingLimit,
-		AnnouncementMessageID: announcementMessageID,
-		Exists:                true,
+		Limit:               limit,
+		LichessRatingLimit:  lichessRatingLimit,
+		ChesscomRatingLimit: chesscomRatingLimit,
+		AnnouncementIntro:   announcementIntro,
+		Exists:              true,
 	}
 	if err := redis.SetMetadata(ctx, tm.Metadata); err != nil {
 		fmt.Printf("error happened while saving metadata to redis: %s", err)
@@ -89,6 +89,7 @@ func (tm *TournamentManager) RemoveTournament(ctx context.Context) error {
 		LichessRatingLimit:    0,
 		ChesscomRatingLimit:   0,
 		AnnouncementMessageID: 0,
+		AnnouncementIntro:     "",
 		Exists:                false,
 	}
 	if err := tm.clearList(ctx); err != nil {
@@ -108,6 +109,7 @@ func (tm *TournamentManager) removeTournament(ctx context.Context) error {
 		LichessRatingLimit:    0,
 		ChesscomRatingLimit:   0,
 		AnnouncementMessageID: 0,
+		AnnouncementIntro:     "",
 		Exists:                false,
 	}
 	if err := tm.clearList(ctx); err != nil {

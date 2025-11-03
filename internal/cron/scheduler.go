@@ -38,9 +38,13 @@ func New(bot *bot.Bot, mainGroupID int64) *Scheduler {
 func (s *Scheduler) Start() {
 	log.Println("starting cron scheduler")
 
-	// s.scheduleWeekly(time.Monday, 12, 0, s.mondayTask)
-	// s.scheduleWeekly(time.Wednesday, 12, 30, s.wednesdayTask)
-	s.scheduleWeekly(time.Saturday, 20, 05, s.testingTournamentStart)
+	s.scheduleWeekly(time.Monday, 12, 00, func() {
+		s.scheduledTournamentStart(26, 0, 0, "запись на южный турнир открыта")
+	})
+
+	s.scheduleWeekly(time.Monday, 21, 00, func() {
+		s.scheduledTournamentEnd()
+	})
 }
 
 func (s *Scheduler) Stop() {
@@ -102,31 +106,15 @@ func (s *Scheduler) timeUntilNext(task scheduledTask) time.Duration {
 	return duration
 }
 
-// task handlers below
-
-// func (s *Scheduler) mondayTask() {
-// 	message := "сегодня понедельник"
-
-// 	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
-// 		log.Printf("failed to send monday message: %v", err)
-// 	}
-// }
-
-// func (s *Scheduler) wednesdayTask() {
-// 	message := "сегодня среда"
-
-// 	if err := s.bot.SendMessage(s.mainGroupID, message); err != nil {
-// 		log.Printf("failed to send wednesday message: %v", err)
-// 	}
-// }
-
-func (s *Scheduler) testingTournamentStart() {
+func (s *Scheduler) scheduledTournamentStart(limit int, lichessRatingLimit int, chesscomRatingLimit int, announcementIntro string) {
 	ctx := context.Background()
-	if err := s.bot.Tournament.CreateTournament(ctx, 26, 0, 0, 0); err != nil {
+
+	if err := s.bot.Tournament.CreateTournament(ctx, limit, lichessRatingLimit, chesscomRatingLimit, announcementIntro); err != nil {
 		log.Printf("failed to create tournament: %v", err)
 		return
 	}
-	announcementMessage := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\nпока никого нет"
+
+	announcementMessage := announcementIntro + "\n\nучастники:\nпока никого нет"
 
 	messageID, err := s.bot.SendMessageAndGetID(s.mainGroupID, announcementMessage)
 	if err != nil {
@@ -141,4 +129,29 @@ func (s *Scheduler) testingTournamentStart() {
 	if err := s.bot.PinMessage(s.mainGroupID, messageID); err != nil {
 		log.Printf("failed to pin message: %v", err)
 	}
+
+	log.Printf("tournament started: limit=%d, lichess_limit=%d, chesscom_limit=%d, intro=%s", limit, lichessRatingLimit, chesscomRatingLimit, announcementIntro)
+}
+
+func (s *Scheduler) scheduledTournamentEnd() {
+	ctx := context.Background()
+
+	if !s.bot.Tournament.Metadata.Exists {
+		log.Printf("no tournament to end")
+		return
+	}
+
+	announcementMessageID := s.bot.Tournament.Metadata.AnnouncementMessageID
+	if announcementMessageID != 0 {
+		if err := s.bot.UnpinMessage(s.mainGroupID, announcementMessageID); err != nil {
+			log.Printf("failed to unpin message: %v", err)
+		}
+	}
+
+	if err := s.bot.Tournament.RemoveTournament(ctx); err != nil {
+		log.Printf("failed to remove tournament: %v", err)
+		return
+	}
+
+	log.Printf("tournament ended and removed")
 }

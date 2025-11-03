@@ -30,9 +30,10 @@ const SiteLichess = "lichess"
 const SiteChesscom = "chesscom"
 
 type TournamentMetadata struct {
-	Limit                 int  `json:"limit"`
-	LichessRatingLimit    int  `json:"lichess_rating_limit"`
-	ChesscomRatingLimit   int  `json:"chesscom_rating_limit"`
-	AnnouncementMessageID int  `json:"announcement_message_id"`
-	Exists                bool `json:"exists"`
+	Limit                 int    `json:"limit"`
+	LichessRatingLimit    int    `json:"lichess_rating_limit"`
+	ChesscomRatingLimit   int    `json:"chesscom_rating_limit"`
+	AnnouncementMessageID int    `json:"announcement_message_id"`
+	AnnouncementIntro     string `json:"announcement_intro"`
+	Exists                bool   `json:"exists"`
 }

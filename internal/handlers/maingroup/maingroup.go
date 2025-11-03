@@ -255,7 +255,12 @@ func updateAnnouncementMessage(b *bot.Bot, chatID int64) error {
 		return nil
 	}
 
-	message := buildTournamentListMessage(b)
+	messageIntro := b.Tournament.Metadata.AnnouncementIntro
+	if messageIntro == "" {
+		messageIntro = "ТУРНИР НАЧАЛСЯ!!!"
+	}
+
+	message := buildTournamentListMessage(b, messageIntro)
 
 	return b.EditMessage(chatID, announcementMessageID, message)
 }
@@ -285,8 +290,8 @@ func promoteQueuedPlayer(b *bot.Bot, ctx context.Context) error {
 	return nil
 }
 
-func buildTournamentListMessage(b *bot.Bot) string {
-	message := "ТУРНИР НАЧАЛСЯ!!!\n\nучастники:\n"
+func buildTournamentListMessage(b *bot.Bot, messageIntro string) string {
+	message := fmt.Sprintf("%s\n\nучастники:\n", messageIntro)
 
 	count := 1
 	for _, player := range b.Tournament.List {
