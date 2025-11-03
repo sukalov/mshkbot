@@ -244,7 +244,11 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 		return b.SendMessage(chatID, "введите ваш никнейм для турниров:")
 
 	case db.StateAskedSavedName:
-		savedName := strings.TrimSpace(update.Message.Text)
+		savedName := utils.Transliterate(update.Message.Text)
+
+		if savedName == "" {
+			return b.SendMessage(chatID, "никнейм не может быть пустым")
+		}
 
 		if err := db.UpdateSavedName(chatID, savedName); err != nil {
 			log.Printf("failed to update saved name: %v", err)
@@ -255,10 +259,10 @@ func handlePrivateMessage(b *bot.Bot, update tgbotapi.Update) error {
 			return fmt.Errorf("failed to update state: %w", err)
 		}
 
-		return b.SendMessage(chatID, "отлично! регистрация завершена. теперь можете записываться на турниры в чате @moscowchessclub")
+		return b.SendMessage(chatID, fmt.Sprintf("отлично! регистрация завершена. ваш никнейм: %s\n\nтеперь можете записываться на турниры в чате @moscowchessclub", savedName))
 
 	case db.StateEditingSavedName:
-		newName := strings.TrimSpace(update.Message.Text)
+		newName := utils.Transliterate(update.Message.Text)
 
 		if newName == "" {
 			return b.SendMessage(chatID, "никнейм не может быть пустым")

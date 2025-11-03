@@ -18,15 +18,17 @@ import (
 func GetHandlers() bot.HandlerSet {
 	return bot.HandlerSet{
 		Commands: map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-			"help":               handleHelp,
-			"tournament":         handleTournament,
-			"tournament_json":    handleTournamentJSON,
-			"create_tournament":  handleCreateTournament,
-			"remove_tournament":  handleRemoveTournament,
-			"suspend_from_green": handleSuspendFromGreen,
-			"ban_player":         handleBanPlayer,
-			"unban_player":       handleUnbanPlayer,
-			"admit_to_green":     handleAdmitToGreen,
+			"help":                 handleHelp,
+			"tournament":           handleTournament,
+			"tournament_json":      handleTournamentJSON,
+			"create_tournament":    handleCreateTournament,
+			"remove_tournament":    handleRemoveTournament,
+			"suspend_from_green":   handleSuspendFromGreen,
+			"ban_player":           handleBanPlayer,
+			"unban_player":         handleUnbanPlayer,
+			"admit_to_green":       handleAdmitToGreen,
+			"test_transliteration": handleTestTransliteration,
+			"transliterate_all":    handleTransliterateAll,
 		},
 		Messages: []func(b *bot.Bot, update tgbotapi.Update) error{
 			handleAdminMessage,
@@ -358,4 +360,40 @@ func handleAdmitToGreen(b *bot.Bot, update tgbotapi.Update) error {
 	adminChatID := update.Message.From.ID
 	b.SetAdminProcess(adminChatID, bot.ProcessTypeAdmitToGreen, "")
 	return b.SendMessage(update.Message.Chat.ID, "учтите, игрок всё равно может не пройти по рейтингу. эта команда просто снимет внутрней бан.\n\nвведите telegram_username пользователя для допуска к зелёным турнирам:")
+}
+
+func handleTestTransliteration(b *bot.Bot, update tgbotapi.Update) error {
+	if err := db.TestTransliteration(); err != nil {
+		log.Printf("failed to test transliteration: %v", err)
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка: %v", err))
+	}
+	return b.SendMessage(update.Message.Chat.ID, "тест завершён, проверьте логи")
+}
+
+func handleTransliterateAll(b *bot.Bot, update tgbotapi.Update) error {
+	changedUsers, err := db.TransliterateAllSavedNames()
+	if err != nil {
+		log.Printf("failed to transliterate all: %v", err)
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка: %v", err))
+	}
+
+	if len(changedUsers) == 0 {
+		return b.SendMessage(update.Message.Chat.ID, "нет пользователей для изменения")
+	}
+
+	successCount := 0
+	failCount := 0
+
+	for _, user := range changedUsers {
+		notificationMessage := fmt.Sprintf("я автоматически убрал из никнеймов заглавные буквы и перевёл все на русский. ваш новый никнейм: %s\n\nесли вам не нравится, что у меня получилось, поменять псевдоним можно командой /change_nickname", user.NewName)
+		if err := b.SendMessage(user.ChatID, notificationMessage); err != nil {
+			log.Printf("failed to notify user %d: %v", user.ChatID, err)
+			failCount++
+		} else {
+			successCount++
+		}
+	}
+
+	summary := fmt.Sprintf("транслитерация завершена:\n\nизменено пользователей: %d\nуведомлено: %d\nне удалось уведомить: %d", len(changedUsers), successCount, failCount)
+	return b.SendMessage(update.Message.Chat.ID, summary)
 }

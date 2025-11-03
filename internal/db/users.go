@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sukalov/mshkbot/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -396,4 +397,83 @@ func GetOrCreateUser(update tgbotapi.Update) (User, bool, error) {
 	}
 
 	return user, isNew, nil
+}
+
+func TestTransliteration() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var users []User
+	result := Database.WithContext(ctx).Find(&users)
+	if result.Error != nil {
+		return fmt.Errorf("failed to get users: %w", result.Error)
+	}
+
+	log.Printf("=== testing transliteration on %d users ===", len(users))
+
+	for _, user := range users {
+		if user.SavedName == "" {
+			continue
+		}
+
+		transliterated := utils.Transliterate(user.SavedName)
+		if user.SavedName != transliterated {
+			log.Printf("user %d (%s): '%s' -> '%s'", user.ChatID, user.Username, user.SavedName, transliterated)
+		} else {
+			log.Printf("user %d (%s): '%s' (no change)", user.ChatID, user.Username, user.SavedName)
+		}
+	}
+
+	log.Printf("=== transliteration test complete ===")
+	return nil
+}
+
+type TransliteratedUser struct {
+	ChatID  int64
+	OldName string
+	NewName string
+}
+
+func TransliterateAllSavedNames() ([]TransliteratedUser, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var users []User
+	result := Database.WithContext(ctx).Find(&users)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get users: %w", result.Error)
+	}
+
+	log.Printf("=== transliterating saved names for %d users ===", len(users))
+
+	var changedUsers []TransliteratedUser
+
+	for _, user := range users {
+		if user.SavedName == "" {
+			continue
+		}
+
+		transliterated := utils.Transliterate(user.SavedName)
+		if user.SavedName != transliterated {
+			updateResult := Database.WithContext(ctx).
+				Model(&User{}).
+				Where("chat_id = ?", user.ChatID).
+				Update("saved_name", transliterated)
+
+			if updateResult.Error != nil {
+				log.Printf("failed to update user %d: %v", user.ChatID, updateResult.Error)
+				continue
+			}
+
+			log.Printf("user %d (%s): '%s' -> '%s'", user.ChatID, user.Username, user.SavedName, transliterated)
+			changedUsers = append(changedUsers, TransliteratedUser{
+				ChatID:  user.ChatID,
+				OldName: user.SavedName,
+				NewName: transliterated,
+			})
+		}
+	}
+
+	log.Printf("=== transliteration complete: %d users changed ===", len(changedUsers))
+	return changedUsers, nil
 }
