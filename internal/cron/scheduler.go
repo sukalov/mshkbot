@@ -38,10 +38,9 @@ func New(bot *bot.Bot, mainGroupID int64) *Scheduler {
 func (s *Scheduler) Start() {
 	log.Println("starting cron scheduler")
 
-	s.scheduleWeekly(time.Monday, 12, 00, func() {
+	s.scheduleWeekly(time.Monday, 15, 35, func() {
+		s.scheduledTournamentStart(26, 0, 0, "запись на южный турнир открыта. нажмите /checkin чтобы записаться")
 	})
-
-	s.scheduledTournamentStart(26, 0, 0, "запись на южный турнир открыта. нажмите /checkin чтобы записаться")
 	s.scheduleWeekly(time.Monday, 21, 00, func() {
 		s.scheduledTournamentEnd()
 	})
