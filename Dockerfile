@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o karaokebot ./cmd/karaokebot
+RUN CGO_ENABLED=0 GOOS=linux go build -o mshkbot ./cmd/mshkbot
 
 # Final stage
 FROM alpine:3.19
@@ -19,11 +19,11 @@ FROM alpine:3.19
 WORKDIR /root/
 
 # Copy the pre-built binary
-COPY --from=builder /app/karaokebot .
+COPY --from=builder /app/mshkbot .
 
 # Add a health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD pgrep karaokebot || exit 1
+  CMD pgrep mshkbot || exit 1
 
 # Run the bot
-CMD ["./karaokebot"]
+CMD ["./mshkbot"]

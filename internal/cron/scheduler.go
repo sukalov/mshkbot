@@ -39,10 +39,25 @@ func (s *Scheduler) Start() {
 	log.Println("starting cron scheduler")
 
 	s.scheduleWeekly(time.Monday, 12, 00, func() {
-		s.scheduledTournamentStart(26, 0, 0, "запись на южный турнир открыта")
 	})
 
+	s.scheduledTournamentStart(26, 0, 0, "запись на южный турнир открыта. нажмите /checkin чтобы записаться")
 	s.scheduleWeekly(time.Monday, 21, 00, func() {
+		s.scheduledTournamentEnd()
+	})
+
+	s.scheduleWeekly(time.Tuesday, 12, 00, func() {
+		s.scheduledTournamentStart(24, 1600, 1400, "открыта запись на зелёный турнир. нажмите /checkin чтобы записаться")
+	})
+
+	s.scheduleWeekly(time.Tuesday, 21, 00, func() {
+		s.scheduledTournamentEnd()
+	})
+
+	s.scheduleWeekly(time.Wednesday, 12, 00, func() {
+		s.scheduledTournamentStart(24, 0, 0, "можно записываться на турнир в ладье. нажмите /checkin чтобы записаться")
+	})
+	s.scheduleWeekly(time.Wednesday, 21, 00, func() {
 		s.scheduledTournamentEnd()
 	})
 }
