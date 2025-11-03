@@ -75,6 +75,16 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 		return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, utils.AlreadyCheckedInMessage())
 	}
 
+	lichessRatingLimit := b.Tournament.Metadata.LichessRatingLimit
+	chesscomRatingLimit := b.Tournament.Metadata.ChesscomRatingLimit
+	isGreenTournament := (lichessRatingLimit > 0 && lichessRatingLimit <= 1600) || (chesscomRatingLimit > 0 && chesscomRatingLimit <= 1400)
+
+	if isGreenTournament {
+		if fullUser.NotGreenUntil != nil && time.Now().Before(*fullUser.NotGreenUntil) {
+			return b.ReplyToMessage(update.Message.Chat.ID, update.Message.MessageID, "вам нельзя в этом турнире играть")
+		}
+	}
+
 	var peakRating *types.PeakRating
 
 	if fullUser.Lichess != nil {
