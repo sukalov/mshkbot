@@ -9,6 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/mshkbot/internal/bot"
 	"github.com/sukalov/mshkbot/internal/db"
+	"github.com/sukalov/mshkbot/internal/redis"
 	"github.com/sukalov/mshkbot/internal/types"
 	"github.com/sukalov/mshkbot/internal/utils"
 )
@@ -31,7 +32,26 @@ func GetHandlers() bot.HandlerSet {
 }
 
 func handleHelp(b *bot.Bot, update tgbotapi.Update) error {
-	return b.SendMessage(update.Message.Chat.ID, "/checkin — записаться на турнир\n\n/checkout — выход из турнира")
+	ctx := context.Background()
+
+	botMessageID, err := b.ReplyToMessageAndGetID(
+		update.Message.Chat.ID,
+		update.Message.MessageID,
+		"/checkin — записаться на турнир\n\n/checkout — выход из турнира",
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := redis.StoreMessageMapping(ctx, update.Message.MessageID, botMessageID); err != nil {
+		log.Printf("failed to store message mapping: %v", err)
+	}
+
+	if err := redis.TrimMessageMappings(ctx, 20); err != nil {
+		log.Printf("failed to trim message mappings: %v", err)
+	}
+
+	return nil
 }
 
 func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
