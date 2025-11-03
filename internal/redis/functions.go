@@ -13,11 +13,11 @@ func SetList(ctx context.Context, list []types.Player) error {
 	if err != nil {
 		return err
 	}
-	return Client.Set(ctx, "tournament_list_dev", listJSON, 0).Err()
+	return Client.Set(ctx, "tournament_list", listJSON, 0).Err()
 }
 
 func GetList(ctx context.Context) ([]types.Player, error) {
-	data, err := Client.Get(ctx, "tournament_list_dev").Bytes()
+	data, err := Client.Get(ctx, "tournament_list").Bytes()
 	if err != nil {
 		if err == redisClient.Nil {
 			return []types.Player{}, nil
@@ -36,11 +36,11 @@ func SetMetadata(ctx context.Context, metadata types.TournamentMetadata) error {
 	if err != nil {
 		return err
 	}
-	return Client.Set(ctx, "tournament_metadata_dev", metadataJSON, 0).Err()
+	return Client.Set(ctx, "tournament_metadata", metadataJSON, 0).Err()
 }
 
 func GetMetadata(ctx context.Context) (types.TournamentMetadata, error) {
-	data, err := Client.Get(ctx, "tournament_metadata_dev").Bytes()
+	data, err := Client.Get(ctx, "tournament_metadata").Bytes()
 	if err != nil {
 		if err == redisClient.Nil {
 			return types.TournamentMetadata{}, nil
