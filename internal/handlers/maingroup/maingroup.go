@@ -151,6 +151,10 @@ func handleCheckIn(b *bot.Bot, update tgbotapi.Update) error {
 	b.Tournament.AddPlayer(ctx, newPlayer)
 	log.Printf("user %d (%s) checked in to tournament", userID, fullUser.Username)
 
+	if err := db.IncrementTimesPlayed(update.Message.From.ID); err != nil {
+		log.Printf("failed to increment times played for user %d: %v", userID, err)
+	}
+
 	if err := updateAnnouncementMessage(b, update.Message.Chat.ID); err != nil {
 		log.Printf("failed to update announcement message: %v", err)
 	}
@@ -198,6 +202,10 @@ func handleCheckOut(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	log.Printf("user %d checked out from tournament", userID)
+
+	if err := db.DecrementTimesPlayed(update.Message.From.ID); err != nil {
+		log.Printf("failed to decrement times played for user %d: %v", userID, err)
+	}
 
 	if wasInTournament {
 		if err := promoteQueuedPlayer(b, ctx); err != nil {

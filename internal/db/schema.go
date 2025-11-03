@@ -17,6 +17,7 @@ type User struct {
 	ChessCom      *string    `gorm:"column:chesscom;unique"`
 	BannedUntil   *time.Time `gorm:"column:banned_until"`
 	NotGreenUntil *time.Time `gorm:"column:not_green_until"`
+	TimesPlayed   int        `gorm:"column:times_played;default:0"`
 	State         State      `gorm:"column:state"`
 	AddedAt       time.Time  `gorm:"column:added_at;autoCreateTime"`
 }

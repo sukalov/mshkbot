@@ -206,6 +206,47 @@ func SetNotGreenUntil(chatID int64, until *time.Time) error {
 	return nil
 }
 
+func IncrementTimesPlayed(chatID int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Update("times_played", gorm.Expr("times_played + ?", 1))
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to increment times played: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d", chatID)
+	}
+
+	return nil
+}
+
+func DecrementTimesPlayed(chatID int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := Database.WithContext(ctx).
+		Model(&User{}).
+		Where("chat_id = ?", chatID).
+		Where("times_played > ?", 0).
+		Update("times_played", gorm.Expr("times_played - ?", 1))
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to decrement times played: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no user found with chat id: %d or times_played already 0", chatID)
+	}
+
+	return nil
+}
+
 // GetAll returns all users
 func GetAll() ([]User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
