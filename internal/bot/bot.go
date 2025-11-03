@@ -65,10 +65,9 @@ func New(name, token string, mainGroupID, adminGroupID int64) (*Bot, error) {
 
 // HandlerSet contains handlers for a specific chat type
 type HandlerSet struct {
-	Commands        map[string]func(b *Bot, update tgbotapi.Update) error
-	Messages        []func(b *Bot, update tgbotapi.Update) error
-	Callbacks       map[string]func(b *Bot, update tgbotapi.Update) error
-	DeletedMessages []func(b *Bot, update tgbotapi.Update) error
+	Commands  map[string]func(b *Bot, update tgbotapi.Update) error
+	Messages  []func(b *Bot, update tgbotapi.Update) error
+	Callbacks map[string]func(b *Bot, update tgbotapi.Update) error
 }
 
 // begins processing updates with handlers for different chat types
@@ -342,11 +341,6 @@ func (b *Bot) GiveReaction(chatID int64, messageID int, emoji string) error {
 
 // replyToMessage sends a text message as a reply to a specific message
 func (b *Bot) ReplyToMessage(chatID int64, messageID int, text string) error {
-	_, err := b.ReplyToMessageAndGetID(chatID, messageID, text)
-	return err
-}
-
-func (b *Bot) ReplyToMessageAndGetID(chatID int64, messageID int, text string) (int, error) {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", b.Client.Token)
 
 	reqBody := map[string]interface{}{
@@ -359,33 +353,22 @@ func (b *Bot) ReplyToMessageAndGetID(chatID int64, messageID int, text string) (
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal request: %w", err)
+		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return 0, fmt.Errorf("failed to send request: %w", err)
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		var result map[string]interface{}
 		json.NewDecoder(resp.Body).Decode(&result)
-		return 0, fmt.Errorf("telegram api error: %v", result)
+		return fmt.Errorf("telegram api error: %v", result)
 	}
 
-	var result struct {
-		Ok     bool `json:"ok"`
-		Result struct {
-			MessageID int `json:"message_id"`
-		} `json:"result"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return result.Result.MessageID, nil
+	return nil
 }
 
 func (b *Bot) PinMessage(chatID int64, messageID int) error {
@@ -447,34 +430,6 @@ func (b *Bot) EditMessage(chatID int64, messageID int, text string) error {
 
 func (b *Bot) UnpinMessage(chatID int64, messageID int) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/unpinChatMessage", b.Client.Token)
-
-	reqBody := map[string]interface{}{
-		"chat_id":    chatID,
-		"message_id": messageID,
-	}
-
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		var result map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&result)
-		return fmt.Errorf("telegram api error: %v", result)
-	}
-
-	return nil
-}
-
-func (b *Bot) DeleteMessage(chatID int64, messageID int) error {
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/deleteMessage", b.Client.Token)
 
 	reqBody := map[string]interface{}{
 		"chat_id":    chatID,
